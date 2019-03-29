@@ -5,7 +5,7 @@ import nifty
 import nifty.graph.rag as nrag
 
 
-def dummy_agglomerator(affs, offssets, previous_segmentation=None,
+def dummy_agglomerator(affs, offsets, previous_segmentation=None,
                        previous_edge=None, previous_weights=None, return_state=False,
                        **parameters):
     pass
@@ -102,11 +102,12 @@ def two_pass_agglomeration(affinities, offsets, agglomerator,
     results = [pass1(block_id) for block_id in blocks1]
 
     # combine results and build graph corresponding to it
-    uvs = np.array([res[0] for res in results])
+    uvs = np.concatenate([res[0] for res in results], axis=0)
     n_labels = int(uvs.max()) + 1
     graph = nifty.graph.undirectedGraph(n_labels)
     graph.insertEdges(uvs)
-    weights = np.array([res[1] for res in results])
+    weights = np.concatenate([res[1] for res in results], axis=0)
+    assert len(uvs) == len(weights)
 
     # calculations for pass 2:
     #
@@ -122,12 +123,18 @@ def two_pass_agglomeration(affinities, offsets, agglomerator,
         # TODO maybe there is a better option than doing this with the rag
         rag = nrag.gridRag(seg, numberOfLabels=int(seg.max() + 1), numberOfThreads=1)
         prev_uv_ids = rag.uvIds()
+        print(prev_uv_ids.shape)
         prev_uv_ids = prev_uv_ids[(prev_uv_ids != 0).all(axis=1)]
+        print(prev_uv_ids.shape)
         edge_ids = graph.findEdges(prev_uv_ids)
+        print(edge_ids)
+        print(edge_ids.shape)
+        assert len(edge_ids) == len(prev_uv_ids), "%i, %i" % (len(edge_ids), len(prev_uv_ids))
+        print(block_id, len(edge_ids))
         prev_weights = weights[edge_ids]
 
         # call the agglomerator with state
-        new_seg = agglomerator(affs, offsets, preious_segmentation=seg,
+        new_seg = agglomerator(affs, offsets, previous_segmentation=seg,
                                previous_edges=prev_uv_ids, previous_weights=prev_weights)
 
         # offset the segmentation with the lowest block coordinate to
