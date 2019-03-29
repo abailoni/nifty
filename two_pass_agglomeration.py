@@ -5,7 +5,7 @@ import nifty
 import nifty.graph.rag as nrag
 
 
-def dummy_agglomerator(affs, offssets, previous_segmentation=None,
+def dummy_agglomerator(affs, offsets, previous_segmentation=None,
                        previous_edge=None, previous_weights=None, return_state=False,
                        **parameters):
     pass
@@ -42,7 +42,7 @@ def get_assignments(segmentation, seeds):
     seed_ids, seed_indices = np.unique(seeds, return_index=True)
     # 0 stands for unseeded
     seed_ids, seed_indices = seed_ids[1:], seed_indices[1:]
-    seg_ids = segmentation[seed_indices]
+    seg_ids = segmentation.ravel()[seed_indices]
     assignments = np.concatenate([seed_ids[:, None], seg_ids[:, None]], axis=1)
     return assignments
 
@@ -102,11 +102,12 @@ def two_pass_agglomeration(affinities, offsets, agglomerator,
     results = [pass1(block_id) for block_id in blocks1]
 
     # combine results and build graph corresponding to it
-    uvs = np.array([res[0] for res in results])
+    uvs = np.concatenate([res[0] for res in results], axis=0)
     n_labels = int(uvs.max()) + 1
     graph = nifty.graph.undirectedGraph(n_labels)
     graph.insertEdges(uvs)
-    weights = np.array([res[1] for res in results])
+    weights = np.concatenate([res[1] for res in results], axis=0)
+    assert len(uvs) == len(weights)
 
     # calculations for pass 2:
     #
@@ -124,10 +125,21 @@ def two_pass_agglomeration(affinities, offsets, agglomerator,
         prev_uv_ids = rag.uvIds()
         prev_uv_ids = prev_uv_ids[(prev_uv_ids != 0).all(axis=1)]
         edge_ids = graph.findEdges(prev_uv_ids)
+        assert len(edge_ids) == len(prev_uv_ids), "%i, %i" % (len(edge_ids), len(prev_uv_ids))
+
+        # TODO for some reason we can get edges here that are not part of the serialized state
+        # I don't fully get why, but it means that we have seeds from the different pass 1
+        # blocks touching
+        # for now, we just get rid of these edges
+        # assert (edge_ids != -1).all()
+        valid_edges = edge_ids == -1
+        edge_ids = edge_ids[valid_edges]
+        prev_uv_ids= prev_uv_ids[valid_edges]
         prev_weights = weights[edge_ids]
+        assert len(prev_uv_ids) == len(prev_weights)
 
         # call the agglomerator with state
-        new_seg = agglomerator(affs, offsets, preious_segmentation=seg,
+        new_seg = agglomerator(affs, offsets, previous_segmentation=seg,
                                previous_edges=prev_uv_ids, previous_weights=prev_weights)
 
         # offset the segmentation with the lowest block coordinate to
