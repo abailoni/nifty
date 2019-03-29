@@ -42,7 +42,7 @@ def get_assignments(segmentation, seeds):
     seed_ids, seed_indices = np.unique(seeds, return_index=True)
     # 0 stands for unseeded
     seed_ids, seed_indices = seed_ids[1:], seed_indices[1:]
-    seg_ids = segmentation[seed_indices]
+    seg_ids = segmentation.ravel()[seed_indices]
     assignments = np.concatenate([seed_ids[:, None], seg_ids[:, None]], axis=1)
     return assignments
 
@@ -123,15 +123,20 @@ def two_pass_agglomeration(affinities, offsets, agglomerator,
         # TODO maybe there is a better option than doing this with the rag
         rag = nrag.gridRag(seg, numberOfLabels=int(seg.max() + 1), numberOfThreads=1)
         prev_uv_ids = rag.uvIds()
-        print(prev_uv_ids.shape)
         prev_uv_ids = prev_uv_ids[(prev_uv_ids != 0).all(axis=1)]
-        print(prev_uv_ids.shape)
         edge_ids = graph.findEdges(prev_uv_ids)
-        print(edge_ids)
-        print(edge_ids.shape)
         assert len(edge_ids) == len(prev_uv_ids), "%i, %i" % (len(edge_ids), len(prev_uv_ids))
-        print(block_id, len(edge_ids))
+
+        # TODO for some reason we can get edges here that are not part of the serialized state
+        # I don't fully get why, but it means that we have seeds from the different pass 1
+        # blocks touching
+        # for now, we just get rid of these edges
+        # assert (edge_ids != -1).all()
+        valid_edges = edge_ids == -1
+        edge_ids = edge_ids[valid_edges]
+        prev_uv_ids= prev_uv_ids[valid_edges]
         prev_weights = weights[edge_ids]
+        assert len(prev_uv_ids) == len(prev_weights)
 
         # call the agglomerator with state
         new_seg = agglomerator(affs, offsets, previous_segmentation=seg,
