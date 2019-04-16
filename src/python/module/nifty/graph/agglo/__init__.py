@@ -191,16 +191,12 @@ def ucmFeatures(graph, edgeIndicators, edgeSizes, nodeSizes,
 def greedyGraphEdgeContraction(graph,
                           signed_edge_weights,
                           update_rule = 'mean',
-                          threshold = 0.5,
-                          # unsigned_edge_weights = None,
                           add_cannot_link_constraints= False,
                           edge_sizes = None,
                           node_sizes = None,
                           is_merge_edge = None,
                           size_regularizer = 0.0,
                           ignored_edge_weights = None,
-                          remove_small_segments = False,
-                          small_segments_thresh = 10
                           ):
     """
     :param ignored_edge_weights: boolean array, if an edge label is True, than the passed signed weight is ignored
@@ -225,24 +221,10 @@ def greedyGraphEdgeContraction(graph,
 
         return parsed_rule
 
-    # if unsigned_edge_weights is not None:
-    #     assert signed_edge_weights is None, "Both signed and unsigned weights were given!"
-    #     assert threshold is not None, "For unsigned weights it is necessary to define a threshold parameter!"
-    #     signed_edge_weights = unsigned_edge_weights - threshold
-
-    merge_prio = numpy.where(signed_edge_weights >= 0, signed_edge_weights, -1.)
-    not_merge_prio = numpy.where(signed_edge_weights < 0, -signed_edge_weights, -1.)
 
     assert ignored_edge_weights is None, "Currently not available"
-    if ignored_edge_weights is not None:
-        assert ignored_edge_weights.shape == signed_edge_weights.shape
-        assert ignored_edge_weights.dtype == 'bool'
-        merge_prio = numpy.where(ignored_edge_weights, -1., merge_prio)
-        not_merge_prio = numpy.where(ignored_edge_weights, -1., not_merge_prio)
 
     parsed_rule = parse_update_rule(update_rule)
-
-    costs_in_PQ = True if update_rule == 'sum' else False
 
     edge_sizes = numpy.ones_like(signed_edge_weights) if edge_sizes is None else edge_sizes
     is_merge_edge = numpy.ones_like(signed_edge_weights) if is_merge_edge is None else is_merge_edge
@@ -255,18 +237,8 @@ def greedyGraphEdgeContraction(graph,
                           edgeSizes=edge_sizes,
                           nodeSizes=node_sizes,
                           updateRule0=parsed_rule,
-                          zeroInit=False,
-                          initSignedWeights=False,
                           sizeRegularizer=size_regularizer,
-                          sizeThreshMin=0.,
-                          sizeThreshMax=0.,
-                          postponeThresholding=False,
-                          costsInPQ=costs_in_PQ,
-                          checkForNegCosts=True,
-                          addNonLinkConstraints=add_cannot_link_constraints,
-                          threshold=threshold,
-                                 removeSmallSegments=remove_small_segments,
-                                 smallSegmentsThresh=small_segments_thresh)
+                          addNonLinkConstraints=add_cannot_link_constraints)
 
 
 greedyGraphEdgeContraction.__doc__ = """

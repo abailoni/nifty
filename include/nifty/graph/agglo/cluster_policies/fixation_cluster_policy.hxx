@@ -48,23 +48,10 @@ public:
     typedef FloatNodeMap                                NodeSizesType;
 
     struct SettingsType{
-
-        // TODO: make threshold-check optional
         Acc0SettingsType updateRule0;
-        bool zeroInit = false; // DEPRECATED
-        bool initSignedWeights = false; // DEPRECATED
         uint64_t numberOfNodesStop{1};
         double sizeRegularizer{0.};
-        double sizeThreshMin{10.}; // DEPRECATED
-        double sizeThreshMax{30.}; // DEPRECATED
-        bool postponeThresholding{true}; // DEPRECATED
-        double threshold{0.5}; // Merge all: 0.0; split all: 1.0 // DEPRECATED
-        //uint64_t numberOfBins{40};
-        bool costsInPQ{true}; // DEPRECATED
-        bool checkForNegCosts{true}; // DEPRECATED
         bool addNonLinkConstraints{false};
-        bool removeSmallSegments{false}; // DEPRECATED
-        uint64_t smallSegmentsThresh{10}; // DEPRECATED
     };
 
     enum class EdgeStates : uint8_t {
@@ -88,8 +75,6 @@ public:
 private:
 
     // internal types
-
-
     typedef nifty::tools::ChangeablePriorityQueue< float , std::greater<float> > QueueType;
 
 
@@ -200,8 +185,6 @@ private:
     uint64_t quadratic_sum_node_size_;
     uint64_t nb_performed_contractions_;
 
-    bool mean_rule_;
-
 
 
     typename GRAPH:: template EdgeMap<EdgeStates>  edgeState_;
@@ -250,59 +233,23 @@ FixationClusterPolicy(
     quadratic_sum_node_size_(0),
     nb_performed_contractions_(0)
 {
-    // FIXME: are ignored segments with both -1 handled well in general?
-    if (settings_.removeSmallSegments && (!settings_.checkForNegCosts || settings_.addNonLinkConstraints || settings_.costsInPQ) ) {
-        NIFTY_CHECK(false,"Small segments not supported atm without checkForNegCosts, with logCosts or with constraints!");
-    }
 
-//    phase_ = 0;
     graph_.forEachNode([&](const uint64_t node) {
         nodeSizes_[node] = nodeSizes[node];
         sum_node_size_ += nodeSizes[node];
         quadratic_sum_node_size_ += nodeSizes[node] * nodeSizes[node];
         if (nodeSizes[node] > max_node_size_)
             max_node_size_ = uint8_t(nodeSizes[node]);
-
         // FIXME: only true if we start from pixels!
         nodeSizeState_[node] = EdgeSizeStates::SMALL;
     });
 
-//    std::cout << "Size reg:" << settings_.sizeRegularizer << "\n";
-//    std::cout << acc0_.name() << "\n";
     graph_.forEachEdge([&](const uint64_t edge){
-
         const auto loc = isLocalEdge[edge];
-
-//        mean_rule_ = acc0_.name() == std::string("ArithmeticMean");
-
-//        if (mean_rule_) {
-//            if (acc0_[edge] < 0.) {
-//                NIFTY_ASSERT_OP(acc1_[edge],>=,0.);
-//                acc0_.set(edge, 0.5 - acc1_[edge], acc1_.weight(edge));
-//            } else {
-//                acc0_.set(edge, 0.5 + acc0_[edge], acc0_.weight(edge));
-//            }
-//        }
-
         // FIXME: only true if we start from pixels!
         edgeSizeState_[edge] = EdgeSizeStates::SMALL;
-
-        // TODO: get rid of this
-//        if(settings_.zeroInit){
-//            edgeState_[edge] = (loc ? EdgeStates::PURE_LOCAL : EdgeStates::PURE_LIFTED);
-//
-//            if(loc == 1){
-//                acc1_.set(edge, 0.0, edgeSizes[edge]);
-//            }
-//            else{
-//                acc0_.set(edge, 0.0, edgeSizes[edge]);
-//            }
-//        } else {
         edgeState_[edge] = (loc == 1 ? EdgeStates::LOCAL : EdgeStates::LIFTED);
-
         pq_.push(edge, this->computeWeight(edge));
-
-//        pq_.push(edge, this->pqMergePrio(edge));
     });
 }
 
@@ -382,8 +329,6 @@ contractEdge(
     const uint64_t edgeToContract
 ){
     // Remember about the highest cost in PQ:
-//    std::cout << edgeToContractNextMergePrio_ << "\n";
-              //    maxCostInPQ_per_iter_[nb_performed_contractions_] = edgeToContractNextMergePrio_;
     maxCostInPQ_per_iter_[nb_performed_contractions_] = edgeContractionGraph_.numberOfEdges();
     pq_.deleteItem(edgeToContract);
 }
@@ -515,9 +460,6 @@ computeWeight(
         const auto sizeU = nodeSizes_[uv.first];
         const auto sizeV = nodeSizes_[uv.second];
         const auto sFac = 2.0 / ( 1.0/std::pow(sizeU,sr) + 1.0/std::pow(sizeV,sr) );
-//        if (edge < 100) {
-//            std::cout << this->pqMergePrio(edge) << "; regFact: " << sFac<<"; sizeU: " << sizeU<<"; sizeV: " << sizeV<<"; final: " << fromEdge*(1. / sFac) << "\n";
-//        }
         return fromEdge * (1. / sFac);
     } else {
         return fromEdge;

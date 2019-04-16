@@ -70,35 +70,15 @@ namespace agglo{
                     const PyViewFloat1 & edgeSizes,
                     const PyViewFloat1 & nodeSizes,
                     const typename ClusterPolicyType::Acc0SettingsType updateRule0,
-                    const bool zeroInit,
-                    const bool initSignedWeights,
                     const uint64_t numberOfNodesStop,
                     const double sizeRegularizer,
-                    const double sizeThreshMin,
-                    const double sizeThreshMax,
-                    const bool postponeThresholding,
-                    const bool costsInPQ,
-                    const bool checkForNegCosts,
-                    const bool addNonLinkConstraints,
-                    const double threshold,
-                    const bool removeSmallSegments,
-                    const uint64_t smallSegmentsThresh
+                    const bool addNonLinkConstraints
                 ){
                     typename ClusterPolicyType::SettingsType s;
                     s.numberOfNodesStop = numberOfNodesStop;
                     s.sizeRegularizer = sizeRegularizer;
-                    s.sizeThreshMin = sizeThreshMin;
-                    s.sizeThreshMax = sizeThreshMax;
-                    s.postponeThresholding = postponeThresholding;
                     s.updateRule0 = updateRule0;
-                    s.zeroInit = zeroInit;
-                    s.initSignedWeights = initSignedWeights;
-                    s.threshold = threshold;
-                    s.costsInPQ = costsInPQ;
-                    s.checkForNegCosts = checkForNegCosts;
                     s.addNonLinkConstraints = addNonLinkConstraints;
-                    s.smallSegmentsThresh = smallSegmentsThresh;
-                    s.removeSmallSegments = removeSmallSegments;
                     auto ptr = new ClusterPolicyType(graph, signedWeights, isLocalEdge, edgeSizes, nodeSizes, s);
                     return ptr;
                 },
@@ -110,19 +90,9 @@ namespace agglo{
                 py::arg("edgeSizes"),
                 py::arg("nodeSizes"),
                 py::arg("updateRule0"),
-                py::arg("zeroInit") = false,
-                py::arg("initSignedWeights") = false,
                 py::arg("numberOfNodesStop") = 1,
                 py::arg("sizeRegularizer") = 0.,
-                py::arg("sizeThreshMin") = 0.,
-                py::arg("sizeThreshMax") = 300.,
-                py::arg("postponeThresholding") = true,
-                py::arg("costsInPQ") = false,
-                py::arg("checkForNegCosts") = true,
                 py::arg("addNonLinkConstraints") = false,
-                py::arg("threshold") = 0.5, // Merge all: 0.0; split all: 1.0
-                py::arg("removeSmallSegments") = false,
-                py::arg("smallSegmentsThresh") = 10
             );
 
             // export the agglomerative clustering functionality for this cluster operator
