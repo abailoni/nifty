@@ -230,8 +230,7 @@ def greedyGraphEdgeContraction(graph,
     is_merge_edge = numpy.ones_like(signed_edge_weights) if is_merge_edge is None else is_merge_edge
     node_sizes = numpy.ones(graph.numberOfNodes ,dtype='float32') if node_sizes is None else node_sizes
 
-
-    return fixationClusterPolicy(graph=graph,
+    return gaspClusterPolicy(graph=graph,
                           signedWeights=signed_edge_weights,
                           isMergeEdge=is_merge_edge,
                           edgeSizes=edge_sizes,

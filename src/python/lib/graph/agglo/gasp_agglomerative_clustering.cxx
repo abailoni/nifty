@@ -16,7 +16,7 @@
 #include "nifty/graph/agglo/agglomerative_clustering.hxx"
 
 
-#include "nifty/graph/agglo/cluster_policies/fixation_cluster_policy.hxx"
+#include "nifty/graph/agglo/cluster_policies/gasp_cluster_policy.hxx"
 #include "nifty/graph/agglo/cluster_policies/detail/merge_rules.hxx"
 
 namespace py = pybind11;
@@ -29,7 +29,7 @@ namespace agglo{
 
 
     template<class GRAPH, class ACC_0, bool WITH_UCM>
-    void exportfixationClusterPolicyTT(py::module & aggloModule) {
+    void exportGaspClusterPolicyTT(py::module & aggloModule) {
 
         typedef GRAPH GraphType;
         const auto graphName = GraphName<GraphType>::name();
@@ -39,8 +39,8 @@ namespace agglo{
 
         {
             // name and type of cluster operator
-            typedef FixationClusterPolicy<GraphType, ACC_0, WITH_UCM> ClusterPolicyType;
-            const auto clusterPolicyBaseName = std::string("FixationClusterPolicy") +  withUcmStr;
+            typedef GaspClusterPolicy<GraphType, ACC_0, WITH_UCM> ClusterPolicyType;
+            const auto clusterPolicyBaseName = std::string("GaspClusterPolicy") +  withUcmStr;
             const auto clusterPolicyBaseName2 = clusterPolicyBaseName + ACC_0::staticName();
             const auto clusterPolicyClsName = clusterPolicyBaseName + graphName + ACC_0::staticName();
             const auto clusterPolicyFacName = lowerFirst(clusterPolicyBaseName);
@@ -106,13 +106,13 @@ namespace agglo{
 
 
 //    template<class GRAPH, class ACC_0>
-//    void exportfixationClusterPolicyT(py::module & aggloModule) {
-//        exportfixationClusterPolicyTT<GRAPH, ACC_0, false>(aggloModule);
-//        //exportfixationClusterPolicy<GRAPH, ACC_0, true >(aggloModule);
+//    void exportGaspClusterPolicyT(py::module & aggloModule) {
+//        exportGaspClusterPolicyTT<GRAPH, ACC_0, false>(aggloModule);
+//        //exportGaspClusterPolicy<GRAPH, ACC_0, true >(aggloModule);
 //    }
 
 
-    void exportFixationAgglomerativeClustering(py::module & aggloModule) {
+    void exportGaspAgglomerativeClustering(py::module & aggloModule) {
         {
             typedef PyUndirectedGraph GraphType;
 
@@ -126,14 +126,14 @@ namespace agglo{
             typedef merge_rules::MutexWatershedEdgeMap<GraphType, float >             MWSAcc;
 
 
-            exportfixationClusterPolicyTT<GraphType, SumAcc, false >(aggloModule);
-            exportfixationClusterPolicyTT<GraphType, ArithmeticMeanAcc, false >(aggloModule);
-            exportfixationClusterPolicyTT<GraphType, SmoothMaxAcc, false>(aggloModule);
-            exportfixationClusterPolicyTT<GraphType, GeneralizedMeanAcc, false>(aggloModule);
-            exportfixationClusterPolicyTT<GraphType, RankOrderAcc , false>(aggloModule);
-            exportfixationClusterPolicyTT<GraphType, MaxAcc, false>(aggloModule);
-            exportfixationClusterPolicyTT<GraphType, MinAcc, false>(aggloModule);
-            exportfixationClusterPolicyTT<GraphType, MWSAcc, false>(aggloModule);
+            exportGaspClusterPolicyTT<GraphType, SumAcc, false >(aggloModule);
+            exportGaspClusterPolicyTT<GraphType, ArithmeticMeanAcc, false >(aggloModule);
+            exportGaspClusterPolicyTT<GraphType, SmoothMaxAcc, false>(aggloModule);
+            exportGaspClusterPolicyTT<GraphType, GeneralizedMeanAcc, false>(aggloModule);
+            exportGaspClusterPolicyTT<GraphType, RankOrderAcc , false>(aggloModule);
+            exportGaspClusterPolicyTT<GraphType, MaxAcc, false>(aggloModule);
+            exportGaspClusterPolicyTT<GraphType, MinAcc, false>(aggloModule);
+            exportGaspClusterPolicyTT<GraphType, MWSAcc, false>(aggloModule);
 
 
         }

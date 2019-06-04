@@ -22,9 +22,9 @@ namespace agglo{
 template<
     class GRAPH, class ACC_0, bool ENABLE_UCM
 >
-class FixationClusterPolicy{
+class GaspClusterPolicy{
 
-    typedef FixationClusterPolicy<
+    typedef GaspClusterPolicy<
         GRAPH, ACC_0,  ENABLE_UCM
     > SelfType;
 
@@ -81,7 +81,7 @@ private:
 public:
 
     template<class MERGE_PRIOS, class IS_LOCAL_EDGE, class EDGE_SIZES, class NODE_SIZES>
-    FixationClusterPolicy(const GraphType &,
+    GaspClusterPolicy(const GraphType &,
                               const MERGE_PRIOS & ,
                               const IS_LOCAL_EDGE &,
                               const EDGE_SIZES & ,
@@ -229,8 +229,8 @@ private:
 
 template<class GRAPH, class ACC_0, bool ENABLE_UCM>
 template<class MERGE_PRIOS, class IS_LOCAL_EDGE,class EDGE_SIZES,class NODE_SIZES>
-inline FixationClusterPolicy<GRAPH, ACC_0, ENABLE_UCM>::
-FixationClusterPolicy(
+inline GaspClusterPolicy<GRAPH, ACC_0, ENABLE_UCM>::
+GaspClusterPolicy(
     const GraphType & graph,
     const MERGE_PRIOS & signedWeights,
     const IS_LOCAL_EDGE & isLocalEdge,
@@ -279,14 +279,14 @@ FixationClusterPolicy(
 
 template<class GRAPH, class ACC_0, bool ENABLE_UCM>
 inline std::pair<uint64_t, double>
-FixationClusterPolicy<GRAPH, ACC_0, ENABLE_UCM>::
+GaspClusterPolicy<GRAPH, ACC_0, ENABLE_UCM>::
 edgeToContractNext() const {
     return std::pair<uint64_t, double>(edgeToContractNext_,edgeToContractNextMergePrio_) ;
 }
 
 template<class GRAPH, class ACC_0, bool ENABLE_UCM>
 inline bool
-FixationClusterPolicy<GRAPH, ACC_0, ENABLE_UCM>::isDone(
+GaspClusterPolicy<GRAPH, ACC_0, ENABLE_UCM>::isDone(
 ){
     while(true) {
         while(!pq_.empty() && !isNegativeInf(pq_.topPriority())){
@@ -323,7 +323,7 @@ FixationClusterPolicy<GRAPH, ACC_0, ENABLE_UCM>::isDone(
 
 template<class GRAPH, class ACC_0, bool ENABLE_UCM>
 inline double
-FixationClusterPolicy<GRAPH, ACC_0, ENABLE_UCM>::
+GaspClusterPolicy<GRAPH, ACC_0, ENABLE_UCM>::
 pqMergePrio(
     const uint64_t edge
 ) const {
@@ -348,7 +348,7 @@ pqMergePrio(
 
 template<class GRAPH, class ACC_0, bool ENABLE_UCM>
 inline void
-FixationClusterPolicy<GRAPH, ACC_0, ENABLE_UCM>::
+GaspClusterPolicy<GRAPH, ACC_0, ENABLE_UCM>::
 contractEdge(
     const uint64_t edgeToContract
 ){
@@ -358,15 +358,15 @@ contractEdge(
 }
 
 template<class GRAPH, class ACC_0, bool ENABLE_UCM>
-inline typename FixationClusterPolicy<GRAPH, ACC_0, ENABLE_UCM>::EdgeContractionGraphType &
-FixationClusterPolicy<GRAPH, ACC_0, ENABLE_UCM>::
+inline typename GaspClusterPolicy<GRAPH, ACC_0, ENABLE_UCM>::EdgeContractionGraphType &
+GaspClusterPolicy<GRAPH, ACC_0, ENABLE_UCM>::
 edgeContractionGraph(){
     return edgeContractionGraph_;
 }
 
 template<class GRAPH, class ACC_0, bool ENABLE_UCM>
 inline void
-FixationClusterPolicy<GRAPH, ACC_0, ENABLE_UCM>::
+GaspClusterPolicy<GRAPH, ACC_0, ENABLE_UCM>::
 mergeNodes(
     const uint64_t aliveNode,
     const uint64_t deadNode
@@ -405,7 +405,7 @@ mergeNodes(
 
 template<class GRAPH, class ACC_0, bool ENABLE_UCM>
 inline void
-FixationClusterPolicy<GRAPH, ACC_0, ENABLE_UCM>::
+GaspClusterPolicy<GRAPH, ACC_0, ENABLE_UCM>::
 mergeEdges(
     const uint64_t aliveEdge,
     const uint64_t deadEdge
@@ -451,7 +451,7 @@ mergeEdges(
 
 template<class GRAPH, class ACC_0, bool ENABLE_UCM>
 inline void
-FixationClusterPolicy<GRAPH, ACC_0, ENABLE_UCM>::
+GaspClusterPolicy<GRAPH, ACC_0, ENABLE_UCM>::
 contractEdgeDone(
     const uint64_t edgeToContract
 ){
@@ -471,7 +471,7 @@ contractEdgeDone(
 
 template<class GRAPH, class ACC_0, bool ENABLE_UCM>
 inline double
-FixationClusterPolicy<GRAPH, ACC_0,  ENABLE_UCM>::
+GaspClusterPolicy<GRAPH, ACC_0,  ENABLE_UCM>::
 computeWeight(
         const uint64_t edge
 ) const {
