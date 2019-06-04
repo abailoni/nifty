@@ -241,13 +241,13 @@ def greedyGraphEdgeContraction(graph,
 
 
 greedyGraphEdgeContraction.__doc__ = """
-Greedy edge contraction of a graph..
+GASP: generalized agglomeration for signed graph partition
 
 Accepted update rules:
  - 'mean'
  - 'max' (single linkage)
  - 'min' (complete linkage)
- - 'MutexWatershed'
+ - 'MutexWatershed' (abs-max)
  - 'sum'
  - {name: 'rank', q=0.5, numberOfBins=40}
  - {name: 'generalized_mean', p=2.0}   # 1.0 is mean

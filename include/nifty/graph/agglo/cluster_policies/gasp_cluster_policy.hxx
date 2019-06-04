@@ -19,13 +19,15 @@ namespace graph{
 namespace agglo{
 
 
+// UCM: ultra contour map (enable an edge union-find datastructure)
+// UPDATE_RULE: the type of linkage criteria implemented in ./details/merge_rules.hxx
+
 template<
-    class GRAPH, class ACC_0, bool ENABLE_UCM
+    class GRAPH, class UPDATE_RULE, bool ENABLE_UCM
 >
 class GaspClusterPolicy{
-
     typedef GaspClusterPolicy<
-        GRAPH, ACC_0,  ENABLE_UCM
+        GRAPH, UPDATE_RULE,  ENABLE_UCM
     > SelfType;
 
 private:
@@ -33,12 +35,13 @@ private:
     typedef typename GRAPH:: template EdgeMap<float> FloatEdgeMap;
     typedef typename GRAPH:: template NodeMap<float> FloatNodeMap;
 
+    // Flat sets for storing cannot-link constraints:
     typedef boost::container::flat_set<uint64_t> SetType;
     typedef typename GRAPH:: template NodeMap<SetType > NonLinkConstraints;
 
-    typedef ACC_0 Acc0Type;
+    typedef UPDATE_RULE UpdateRuleType;
 public:
-    typedef typename Acc0Type::SettingsType Acc0SettingsType;
+    typedef typename UpdateRuleType::SettingsType UpdateRuleSettingsType;
 
 
     // input types
@@ -48,26 +51,16 @@ public:
     typedef FloatNodeMap                                NodeSizesType;
 
     struct SettingsType{
-        Acc0SettingsType updateRule0;
+        UpdateRuleSettingsType updateRule;
         uint64_t numberOfNodesStop{1};
         double sizeRegularizer{0.};
         bool addNonLinkConstraints{false};
     };
 
     enum class EdgeStates : uint8_t {
-        PURE_LOCAL = 0,
-        LOCAL = 1,
-        LIFTED = 2,
-        PURE_LIFTED = 3
+        LOCAL = 0, // Edge represent e.g. two direct neighbors that can be contracted
+        LIFTED = 1, // Lifted edges cannot be contracted until it is merged with some local one
     };
-
-    enum class EdgeSizeStates : uint8_t {
-        SMALL = 0,
-        FROM_SMALL_TO_BIG = 1,
-        BIG = 2,
-    };
-
-
 
     typedef EdgeContractionGraph<GraphType, SelfType>   EdgeContractionGraphType;
 
@@ -80,9 +73,9 @@ private:
 
 public:
 
-    template<class MERGE_PRIOS, class IS_LOCAL_EDGE, class EDGE_SIZES, class NODE_SIZES>
+    template<class SIGNED_WEIGHTS, class IS_LOCAL_EDGE, class EDGE_SIZES, class NODE_SIZES>
     GaspClusterPolicy(const GraphType &,
-                              const MERGE_PRIOS & ,
+                              const SIGNED_WEIGHTS & ,
                               const IS_LOCAL_EDGE &,
                               const EDGE_SIZES & ,
                               const NODE_SIZES & ,
@@ -126,11 +119,11 @@ public:
         // Here we do not care about the fact that an edge is lifted or not.
         // We just look at the priority
 
-        return acc0_[edge] > 0.;
+        return accumulated_weights_[edge] > 0.;
     }
 
     double edgeCostInPQ(const uint64_t edge) const{
-        const auto priority = acc0_[edge];
+        const auto priority = accumulated_weights_[edge];
         if (settings_.addNonLinkConstraints) {
             return std::abs(priority);
         } else {
@@ -139,7 +132,6 @@ public:
     }
 
     void addNonLinkConstraint(const uint64_t edge){
-        //std::cout<<"add non link constraint\n";
         const auto uv = edgeContractionGraph_.uv(edge);
         const auto u = uv.first;
         const auto v = uv.second;
@@ -176,8 +168,8 @@ public:
             if (u != v && notVisitedEdges(cEdge)) {
                 out(edge_counter, 0) = u;
                 out(edge_counter, 1) = v;
-                out(edge_counter, 2) = acc0_[cEdge];
-                out(edge_counter, 3) = acc0_.weight(cEdge);
+                out(edge_counter, 2) = accumulated_weights_[cEdge];
+                out(edge_counter, 3) = accumulated_weights_.weight(cEdge);
                 edge_counter++;
                 notVisitedEdges(cEdge) = false;
             };
@@ -198,7 +190,24 @@ private:
 
 //    int phase_;
 
-    ACC_0 acc0_;
+    UPDATE_RULE accumulated_weights_;
+    uint64_t nb_performed_contractions_;
+
+    // State of the edges (LOCAL or LIFTED)
+    typename GRAPH:: template EdgeMap<EdgeStates>  edgeState_;
+
+    SettingsType        settings_;
+
+    // Contracted graph:
+    EdgeContractionGraphType edgeContractionGraph_;
+
+    // Priority queue:
+    QueueType pq_;
+
+    uint64_t edgeToContractNext_;
+    double   edgeToContractNextMergePrio_;
+
+    // TODO: get rid of these deprecated attributes
     NodeSizesType nodeSizes_;
     NodeSizesType maxNodeSize_per_iter_;
     NodeSizesType meanNodeSize_per_iter_;
@@ -207,32 +216,14 @@ private:
     uint64_t max_node_size_;
     uint64_t sum_node_size_;
     uint64_t quadratic_sum_node_size_;
-    uint64_t nb_performed_contractions_;
-
-
-
-    typename GRAPH:: template EdgeMap<EdgeStates>  edgeState_;
-    typename GRAPH:: template EdgeMap<EdgeSizeStates>  edgeSizeState_;
-    typename GRAPH:: template NodeMap<EdgeSizeStates>  nodeSizeState_;
-
-    SettingsType        settings_;
-
-    // INTERNAL
-    EdgeContractionGraphType edgeContractionGraph_;
-    QueueType pq_;
-
-    uint64_t edgeToContractNext_;
-    double   edgeToContractNextMergePrio_;
 };
 
-//    TODO: rename MERGE_PRIO in something like ATTRACTIVE_COSTS
-
-template<class GRAPH, class ACC_0, bool ENABLE_UCM>
-template<class MERGE_PRIOS, class IS_LOCAL_EDGE,class EDGE_SIZES,class NODE_SIZES>
-inline GaspClusterPolicy<GRAPH, ACC_0, ENABLE_UCM>::
+template<class GRAPH, class UPDATE_RULE, bool ENABLE_UCM>
+template<class SIGNED_WEIGHTS, class IS_LOCAL_EDGE,class EDGE_SIZES,class NODE_SIZES>
+inline GaspClusterPolicy<GRAPH, UPDATE_RULE, ENABLE_UCM>::
 GaspClusterPolicy(
     const GraphType & graph,
-    const MERGE_PRIOS & signedWeights,
+    const SIGNED_WEIGHTS & signedWeights,
     const IS_LOCAL_EDGE & isLocalEdge,
     const EDGE_SIZES      & edgeSizes,
     const NODE_SIZES      & nodeSizes,
@@ -240,11 +231,9 @@ GaspClusterPolicy(
 )
 :   graph_(graph),
     nonLinkConstraints_(graph),
-    acc0_(graph, signedWeights, edgeSizes, settings.updateRule0),
+    accumulated_weights_(graph, signedWeights, edgeSizes, settings.updateRule),
     edgeState_(graph),
     nodeSizes_(graph),
-    edgeSizeState_(graph),
-    nodeSizeState_(graph),
     pq_(graph.edgeIdUpperBound()+1),
     settings_(settings),
     edgeContractionGraph_(graph, *this),
@@ -264,29 +253,25 @@ GaspClusterPolicy(
         quadratic_sum_node_size_ += nodeSizes[node] * nodeSizes[node];
         if (nodeSizes[node] > max_node_size_)
             max_node_size_ = uint8_t(nodeSizes[node]);
-        // FIXME: only true if we start from pixels!
-        nodeSizeState_[node] = EdgeSizeStates::SMALL;
     });
 
     graph_.forEachEdge([&](const uint64_t edge){
         const auto loc = isLocalEdge[edge];
-        // FIXME: only true if we start from pixels!
-        edgeSizeState_[edge] = EdgeSizeStates::SMALL;
         edgeState_[edge] = (loc == 1 ? EdgeStates::LOCAL : EdgeStates::LIFTED);
         pq_.push(edge, this->computeWeight(edge));
     });
 }
 
-template<class GRAPH, class ACC_0, bool ENABLE_UCM>
+template<class GRAPH, class UPDATE_RULE, bool ENABLE_UCM>
 inline std::pair<uint64_t, double>
-GaspClusterPolicy<GRAPH, ACC_0, ENABLE_UCM>::
+GaspClusterPolicy<GRAPH, UPDATE_RULE, ENABLE_UCM>::
 edgeToContractNext() const {
     return std::pair<uint64_t, double>(edgeToContractNext_,edgeToContractNextMergePrio_) ;
 }
 
-template<class GRAPH, class ACC_0, bool ENABLE_UCM>
+template<class GRAPH, class UPDATE_RULE, bool ENABLE_UCM>
 inline bool
-GaspClusterPolicy<GRAPH, ACC_0, ENABLE_UCM>::isDone(
+GaspClusterPolicy<GRAPH, UPDATE_RULE, ENABLE_UCM>::isDone(
 ){
     while(true) {
         while(!pq_.empty() && !isNegativeInf(pq_.topPriority())){
@@ -321,15 +306,15 @@ GaspClusterPolicy<GRAPH, ACC_0, ENABLE_UCM>::isDone(
     }
 }
 
-template<class GRAPH, class ACC_0, bool ENABLE_UCM>
+template<class GRAPH, class UPDATE_RULE, bool ENABLE_UCM>
 inline double
-GaspClusterPolicy<GRAPH, ACC_0, ENABLE_UCM>::
+GaspClusterPolicy<GRAPH, UPDATE_RULE, ENABLE_UCM>::
 pqMergePrio(
     const uint64_t edge
 ) const {
     const auto s = edgeState_[edge];
     double costInPQ;
-    if(s == EdgeStates::LOCAL || s==EdgeStates::PURE_LOCAL){
+    if(s == EdgeStates::LOCAL){
         costInPQ = this->edgeCostInPQ(edge);
     }
     else{
@@ -346,9 +331,9 @@ pqMergePrio(
     return costInPQ;
 }
 
-template<class GRAPH, class ACC_0, bool ENABLE_UCM>
+template<class GRAPH, class UPDATE_RULE, bool ENABLE_UCM>
 inline void
-GaspClusterPolicy<GRAPH, ACC_0, ENABLE_UCM>::
+GaspClusterPolicy<GRAPH, UPDATE_RULE, ENABLE_UCM>::
 contractEdge(
     const uint64_t edgeToContract
 ){
@@ -357,16 +342,16 @@ contractEdge(
     pq_.deleteItem(edgeToContract);
 }
 
-template<class GRAPH, class ACC_0, bool ENABLE_UCM>
-inline typename GaspClusterPolicy<GRAPH, ACC_0, ENABLE_UCM>::EdgeContractionGraphType &
-GaspClusterPolicy<GRAPH, ACC_0, ENABLE_UCM>::
+template<class GRAPH, class UPDATE_RULE, bool ENABLE_UCM>
+inline typename GaspClusterPolicy<GRAPH, UPDATE_RULE, ENABLE_UCM>::EdgeContractionGraphType &
+GaspClusterPolicy<GRAPH, UPDATE_RULE, ENABLE_UCM>::
 edgeContractionGraph(){
     return edgeContractionGraph_;
 }
 
-template<class GRAPH, class ACC_0, bool ENABLE_UCM>
+template<class GRAPH, class UPDATE_RULE, bool ENABLE_UCM>
 inline void
-GaspClusterPolicy<GRAPH, ACC_0, ENABLE_UCM>::
+GaspClusterPolicy<GRAPH, UPDATE_RULE, ENABLE_UCM>::
 mergeNodes(
     const uint64_t aliveNode,
     const uint64_t deadNode
@@ -403,9 +388,9 @@ mergeNodes(
 
 }
 
-template<class GRAPH, class ACC_0, bool ENABLE_UCM>
+template<class GRAPH, class UPDATE_RULE, bool ENABLE_UCM>
 inline void
-GaspClusterPolicy<GRAPH, ACC_0, ENABLE_UCM>::
+GaspClusterPolicy<GRAPH, UPDATE_RULE, ENABLE_UCM>::
 mergeEdges(
     const uint64_t aliveEdge,
     const uint64_t deadEdge
@@ -418,26 +403,18 @@ mergeEdges(
     pq_.deleteItem(deadEdge);
 
     // update priority:
-    acc0_.merge(aliveEdge, deadEdge);
+    accumulated_weights_.merge(aliveEdge, deadEdge);
 
 
     // update state
     auto & sa = edgeState_[aliveEdge];
     const auto  sd = edgeState_[deadEdge];
-    if(sa == EdgeStates::PURE_LIFTED &&  sd == EdgeStates::PURE_LIFTED){
-        sa =  EdgeStates::PURE_LIFTED;
-    }
-    else if(sa == EdgeStates::PURE_LOCAL &&  sd == EdgeStates::PURE_LOCAL){
-        sa = EdgeStates::PURE_LOCAL;
-    }
-    else if(
-        sa == EdgeStates::PURE_LOCAL ||  sa == EdgeStates::LOCAL ||
-        sd == EdgeStates::PURE_LOCAL ||  sd == EdgeStates::LOCAL
+    if(
+        sa == EdgeStates::LOCAL || sd == EdgeStates::LOCAL
     ){
         sa = EdgeStates::LOCAL;
     }
-    else if((sa == EdgeStates::PURE_LIFTED ||  sa == EdgeStates::LIFTED)  &&
-            (sd == EdgeStates::PURE_LIFTED ||  sd == EdgeStates::LIFTED) )
+    else if( sa == EdgeStates::LIFTED  && sd == EdgeStates::LIFTED )
     {
         sa = EdgeStates::LIFTED;
     }
@@ -449,9 +426,9 @@ mergeEdges(
 }
 
 
-template<class GRAPH, class ACC_0, bool ENABLE_UCM>
+template<class GRAPH, class UPDATE_RULE, bool ENABLE_UCM>
 inline void
-GaspClusterPolicy<GRAPH, ACC_0, ENABLE_UCM>::
+GaspClusterPolicy<GRAPH, UPDATE_RULE, ENABLE_UCM>::
 contractEdgeDone(
     const uint64_t edgeToContract
 ){
@@ -469,9 +446,9 @@ contractEdgeDone(
 
 }
 
-template<class GRAPH, class ACC_0, bool ENABLE_UCM>
+template<class GRAPH, class UPDATE_RULE, bool ENABLE_UCM>
 inline double
-GaspClusterPolicy<GRAPH, ACC_0,  ENABLE_UCM>::
+GaspClusterPolicy<GRAPH, UPDATE_RULE,  ENABLE_UCM>::
 computeWeight(
         const uint64_t edge
 ) const {

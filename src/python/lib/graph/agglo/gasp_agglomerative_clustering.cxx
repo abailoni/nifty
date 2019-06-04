@@ -28,7 +28,7 @@ namespace graph{
 namespace agglo{
 
 
-    template<class GRAPH, class ACC_0, bool WITH_UCM>
+    template<class GRAPH, class UPDATE_RULE, bool WITH_UCM>
     void exportGaspClusterPolicyTT(py::module & aggloModule) {
 
         typedef GRAPH GraphType;
@@ -39,10 +39,10 @@ namespace agglo{
 
         {
             // name and type of cluster operator
-            typedef GaspClusterPolicy<GraphType, ACC_0, WITH_UCM> ClusterPolicyType;
+            typedef GaspClusterPolicy<GraphType, UPDATE_RULE, WITH_UCM> ClusterPolicyType;
             const auto clusterPolicyBaseName = std::string("GaspClusterPolicy") +  withUcmStr;
-            const auto clusterPolicyBaseName2 = clusterPolicyBaseName + ACC_0::staticName();
-            const auto clusterPolicyClsName = clusterPolicyBaseName + graphName + ACC_0::staticName();
+            const auto clusterPolicyBaseName2 = clusterPolicyBaseName + UPDATE_RULE::staticName();
+            const auto clusterPolicyClsName = clusterPolicyBaseName + graphName + UPDATE_RULE::staticName();
             const auto clusterPolicyFacName = lowerFirst(clusterPolicyBaseName);
 
             // the cluster operator cls
@@ -73,7 +73,7 @@ namespace agglo{
                     const PyViewUInt8_1 & isLocalEdge,
                     const PyViewFloat1 & edgeSizes,
                     const PyViewFloat1 & nodeSizes,
-                    const typename ClusterPolicyType::Acc0SettingsType updateRule0,
+                    const typename ClusterPolicyType::UpdateRuleSettingsType updateRule,
                     const uint64_t numberOfNodesStop,
                     const double sizeRegularizer,
                     const bool addNonLinkConstraints
@@ -81,7 +81,7 @@ namespace agglo{
                     typename ClusterPolicyType::SettingsType s;
                     s.numberOfNodesStop = numberOfNodesStop;
                     s.sizeRegularizer = sizeRegularizer;
-                    s.updateRule0 = updateRule0;
+                    s.updateRule = updateRule;
                     s.addNonLinkConstraints = addNonLinkConstraints;
                     auto ptr = new ClusterPolicyType(graph, signedWeights, isLocalEdge, edgeSizes, nodeSizes, s);
                     return ptr;
@@ -103,13 +103,6 @@ namespace agglo{
             exportAgglomerativeClusteringTClusterPolicy<ClusterPolicyType>(aggloModule, clusterPolicyBaseName2);
         }
     }
-
-
-//    template<class GRAPH, class ACC_0>
-//    void exportGaspClusterPolicyT(py::module & aggloModule) {
-//        exportGaspClusterPolicyTT<GRAPH, ACC_0, false>(aggloModule);
-//        //exportGaspClusterPolicy<GRAPH, ACC_0, true >(aggloModule);
-//    }
 
 
     void exportGaspAgglomerativeClustering(py::module & aggloModule) {
