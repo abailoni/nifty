@@ -160,9 +160,9 @@ cmake .. \
 \
         -DBOOST_ROOT=${PREFIX} \
         -DWITH_HDF5=OFF \
-        -DWITH_Z5=ON \
-        -DWITH_ZLIB=ON \
-        -DWITH_BLOSC=ON \
+        -DWITH_Z5=OFF \
+        -DWITH_ZLIB=OFF \
+        -DWITH_BLOSC=OFF \
         ${CPLEX_ARGS} \
         ${GUROBI_ARGS} \
 \
@@ -170,6 +170,7 @@ cmake .. \
         -DPYTHON_EXECUTABLE=${PYTHON} \
         -DPYTHON_LIBRARY=${PREFIX}/lib/libpython${PY_ABI}.${DYLIB} \
         -DPYTHON_INCLUDE_DIR=${PREFIX}/include/python${PY_ABI} \
+        -DPYTHON_NUMPY_INCLUDE_DIR=${PREFIX}/lib/python${PY_VER}/site-packages/numpy/core/include \
 ##
 
 ##
