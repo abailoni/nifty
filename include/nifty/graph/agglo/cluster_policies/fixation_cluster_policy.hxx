@@ -125,6 +125,7 @@ public:
     bool isMergeAllowed(const uint64_t edge) const{
         // Here we do not care about the fact that an edge is lifted or not.
         // We just look at the priority
+
         return acc0_[edge] > 0.;
     }
 
@@ -146,7 +147,8 @@ public:
         nonLinkConstraints_[uv.second].insert(uv.first);
     }
 
-    auto exportAgglomerationData(){
+    auto exportFinalNodeDataOriginalGraph(){
+        // Export node data of the ORIGINAL graph:
         typename xt::xtensor<float, 2>::shape_type retshape;
         retshape[0] = graph_.nodeIdUpperBound()+1;
         retshape[1] = 4;
@@ -157,6 +159,28 @@ public:
             out(node, 1) = maxCostInPQ_per_iter_[node];
             out(node, 2) = meanNodeSize_per_iter_[node];
             out(node, 3) = variance_[node];
+        });
+        return out;
+    }
+
+    auto exportFinalEdgeDataContractedGraph(){
+        // Export edge data of the contracted graph:
+        xt::xtensor<float, 2> out = xt::zeros<float>({uint64_t(edgeContractionGraph().numberOfEdges()), uint64_t(4)});
+        xt::xtensor<bool, 1> notVisitedEdges = xt::ones<bool>({graph_.edgeIdUpperBound()+1});
+        uint64_t edge_counter = 0;
+        graph_.forEachEdge([&](const uint64_t edge){
+            const auto cEdge = edgeContractionGraph_.findRepresentativeEdge(edge);
+            const auto uv = edgeContractionGraph_.uv(cEdge);
+            const auto u = edgeContractionGraph_.findRepresentativeNode(uv.first);
+            const auto v = edgeContractionGraph_.findRepresentativeNode(uv.second);
+            if (u != v && notVisitedEdges(cEdge)) {
+                out(edge_counter, 0) = u;
+                out(edge_counter, 1) = v;
+                out(edge_counter, 2) = acc0_[cEdge];
+                out(edge_counter, 3) = acc0_.weight(cEdge);
+                edge_counter++;
+                notVisitedEdges(cEdge) = false;
+            };
         });
         return out;
     }
@@ -464,8 +488,6 @@ computeWeight(
     } else {
         return fromEdge;
     }
-
-
 }
 
 

@@ -514,8 +514,9 @@ namespace merge_rules{
             values_[targetEdge] = value;
         }
         T weight(const uint64_t edge)const{
-            NIFTY_CHECK(false,"Not implemented");
-            return values_[edge];
+//            NIFTY_CHECK(false,"Not implemented");
+            return 1.0;
+//            return values_[edge];
         }
 
         T operator[](const uint64_t edge)const{
@@ -576,8 +577,9 @@ namespace merge_rules{
             values_[targetEdge] = value;
         }
         T weight(const uint64_t edge)const{
-            NIFTY_CHECK(false,"Not implemented");
-            return values_[edge];
+//            NIFTY_CHECK(false,"Not implemented");
+            return 1.0;
+//            return values_[edge];
         }
 
         T operator[](const uint64_t edge)const{
@@ -640,8 +642,9 @@ namespace merge_rules{
         }
 
         T weight(const uint64_t edge)const{
-            NIFTY_CHECK(false,"Not implemented");
-            return values_[edge];
+//            NIFTY_CHECK(false,"Not implemented");
+            return 1.0;
+//            return values_[edge];
         }
         T operator[](const uint64_t edge)const{
             return values_[edge];

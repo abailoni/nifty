@@ -56,9 +56,13 @@ namespace agglo{
                     .def("exportAgglomerationData", [](
                             ClusterPolicyType * self
                          ){
-                             return self->exportAgglomerationData();
+//                        auto edgeContractionGraph = self->edgeContractionGraph();
+                            auto out1 = self->exportFinalNodeDataOriginalGraph();
+                            auto out2 = self->exportFinalEdgeDataContractedGraph();
+                            return std::make_tuple(out1, out2);
                          }
                     );
+
 
 
             // factory
@@ -92,7 +96,7 @@ namespace agglo{
                 py::arg("updateRule0"),
                 py::arg("numberOfNodesStop") = 1,
                 py::arg("sizeRegularizer") = 0.,
-                py::arg("addNonLinkConstraints") = false,
+                py::arg("addNonLinkConstraints") = false
             );
 
             // export the agglomerative clustering functionality for this cluster operator
