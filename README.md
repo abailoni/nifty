@@ -1,18 +1,33 @@
-Travis (Ubuntu builds)
----------------------------------
+Nifty
+========
+
+## Installation (Linux):
+
+#### Via Conda
+The easiest way to install this version is via conda (right now only available withour gurobi or cplex ):
+
+```
+conda install -c abailoni nifty
+```
+
+##### Installation from source
+- `git clone https://github.com/abailoni/nifty.git`
+- `git submodule init`
+- `git submodule update`
+- `conda create -n nifty -c conda-forge xtensor-python boost-cpp scikit-image h5py vigra`
+- `cmake . -DCMAKE_PREFIX_PATH=/path/to/nifty/env -DBUILD_NIFTY_PYTHON=ON` (add links to gurobi or cplex if needed)
+- `make`
+
+## Description
+
+### Travis (Ubuntu builds)
 Master: [![Build Status master](https://travis-ci.org/constantinpape/nifty.svg?branch=master)](https://travis-ci.org/DerThorsten/nifty)
 
-Appveyor (Windows builds)
----------------------------------
+### Appveyor (Windows builds)
 Master: 
 [![Build status](https://ci.appveyor.com/api/projects/status/u6nfcpfhpyya5mk8/branch/master?svg=true)](https://ci.appveyor.com/project/DerThorsten/nifty-5sb8n/branch/master)
 Dev:
 [![Build status](https://ci.appveyor.com/api/projects/status/u6nfcpfhpyya5mk8/branch/dev?svg=true)](https://ci.appveyor.com/project/DerThorsten/nifty-5sb8n/branch/dev)
-
-
-Nifty
-========
-
 
 
 
@@ -24,16 +39,16 @@ The core is implemented in C++ but
 the suggested language to use this library from is
 python.
 
-Important:
-=========
-To use nifty one needs to checkout some submodules via:
+<!--Important:-->
+<!--=========-->
+<!--To use nifty one needs to checkout some submodules via:-->
 
-    git submodule init
-    git submodule update
+<!--    git submodule init-->
+<!--    git submodule update-->
 
-If WITH_MP_LP is active, one needs:
+<!--If WITH_MP_LP is active, one needs:-->
 
-    git submodule update --init --recursive
+<!--    git submodule update --init --recursive-->
 
 Documentation:
 ===============
@@ -97,23 +112,14 @@ The Python API is at present the easiest to use. The C++ API is mostly for power
 We recommend to use library from Python.
 Almost any class / function in the Python API is calling into C++ via pybind11.
 
-Install:
-========
-
-The easiest way to install this version is via conda (right now only available with gurobi, cplex version coming soon):
-
-```
-$ GUROBI_ROOT_DIR=/path/to/gurobi conda install -c cpape nifty-with-gurobi
-```
 
 
+<!--Troubleshooting:-->
+<!--=================-->
 
-Troubleshooting:
-=================
+<!--TODO-->
 
-TODO
+<!--Changelog:-->
+<!--=================-->
 
-Changelog:
-=================
-
-TODO
+<!--TODO-->
