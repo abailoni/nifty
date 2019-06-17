@@ -15,16 +15,16 @@ for key in __agglo.__dict__.keys():
 from ...tools import makeDense as __makeDense
 
 
-def updatRule(name, **kwargs):
-    if name == 'max':
+def updateRule(name, **kwargs):
+    if name in ['max', 'single_linkage']:
         return MaxSettings()
-    elif name == 'MutexWatershed':
+    elif name in ['mutex_watershed', 'abs_max']:
         return MutexWatershedSettings()
-    elif name == 'min':
+    elif name in ['min', 'complete_linkage']:
         return MinSettings()
     elif name == 'sum':
         return SumSettings()
-    elif name == 'mean':
+    elif name in ['mean', 'average', 'avg']:
         return ArithmeticMeanSettings()
     elif name in ['gmean', 'generalized_mean']:
         p = kwargs.get('p',1.0)
@@ -38,6 +38,56 @@ def updatRule(name, **kwargs):
         return RankOrderSettings(q=float(q), numberOfBins=int(numberOfBins))
     else:
         return NotImplementedError("not yet implemented")
+
+def get_GASP_policy(graph,
+                    signed_edge_weights,
+                    linkage_criteria = 'mean',
+                    linkage_criteria_kwargs = None,
+                    add_cannot_link_constraints= False,
+                    edge_sizes = None,
+                    is_mergeable_edge = None,
+                    node_sizes = None,
+                    size_regularizer = 0.0,
+                    ):
+    linkage_criteria_kwargs = {} if linkage_criteria_kwargs is None else linkage_criteria_kwargs
+    parsed_rule = updateRule(linkage_criteria, **linkage_criteria_kwargs)
+
+    edge_sizes = numpy.ones_like(signed_edge_weights) if edge_sizes is None else edge_sizes
+    is_mergeable_edge = numpy.ones_like(signed_edge_weights) if is_mergeable_edge is None else is_mergeable_edge
+    node_sizes = numpy.ones(graph.numberOfNodes ,dtype='float32') if node_sizes is None else node_sizes
+
+    return gaspClusterPolicy(graph=graph,
+                             signedWeights=signed_edge_weights,
+                             isMergeEdge=is_mergeable_edge,
+                             edgeSizes=edge_sizes,
+                             nodeSizes=node_sizes,
+                             updateRule0=parsed_rule,
+                             sizeRegularizer=size_regularizer,
+                             addNonLinkConstraints=add_cannot_link_constraints)
+
+
+get_GASP_policy.__doc__ = """
+GASP: generalized agglomeration for signed graph partition
+
+Accepted update rules:
+ - 'mean'
+ - 'max' (single linkage)
+ - 'min' (complete linkage)
+ - 'MutexWatershed' (abs-max)
+ - 'sum'
+ - {name: 'rank', q=0.5, numberOfBins=40}
+ - {name: 'generalized_mean', p=2.0}   # 1.0 is mean
+ - {name: 'smooth_max', p=2.0}   # 0.0 is mean
+ """
+
+
+
+
+
+
+
+
+
 
 
 # def fixationClusterPolicy(graph, 
@@ -187,69 +237,3 @@ def ucmFeatures(graph, edgeIndicators, edgeSizes, nodeSizes,
 
     return numpy.concatenate(fOut, axis=1)
 
-
-def greedyGraphEdgeContraction(graph,
-                          signed_edge_weights,
-                          update_rule = 'mean',
-                          add_cannot_link_constraints= False,
-                          edge_sizes = None,
-                          node_sizes = None,
-                          is_merge_edge = None,
-                          size_regularizer = 0.0,
-                          ignored_edge_weights = None,
-                          ):
-    """
-    :param ignored_edge_weights: boolean array, if an edge label is True, than the passed signed weight is ignored
-            (neither attractive nor repulsive)
-    :return:
-    """
-    def parse_update_rule(rule):
-        accepted_rules_1 = ['max', 'min', 'mean', 'sum', 'MutexWatershed']
-        accepted_rules_2 = ['generalized_mean', 'rank', 'smooth_max']
-        if not isinstance(rule, str):
-            rule = rule.copy()
-            assert isinstance(rule, dict)
-            rule_name = rule.pop('name')
-            p = rule.get('p')
-            q = rule.get('q')
-            assert rule_name in accepted_rules_1 + accepted_rules_2, "Passed update rule is not implemented"
-            assert not (p is None and q is None), "Passed update rule is not implemented"
-            parsed_rule = updatRule(rule_name, **rule)
-        else:
-            assert rule in accepted_rules_1, "Passed update rule is not implemented"
-            parsed_rule = updatRule(rule)
-
-        return parsed_rule
-
-
-    assert ignored_edge_weights is None, "Currently not available"
-
-    parsed_rule = parse_update_rule(update_rule)
-
-    edge_sizes = numpy.ones_like(signed_edge_weights) if edge_sizes is None else edge_sizes
-    is_merge_edge = numpy.ones_like(signed_edge_weights) if is_merge_edge is None else is_merge_edge
-    node_sizes = numpy.ones(graph.numberOfNodes ,dtype='float32') if node_sizes is None else node_sizes
-
-    return gaspClusterPolicy(graph=graph,
-                          signedWeights=signed_edge_weights,
-                          isMergeEdge=is_merge_edge,
-                          edgeSizes=edge_sizes,
-                          nodeSizes=node_sizes,
-                          updateRule0=parsed_rule,
-                          sizeRegularizer=size_regularizer,
-                          addNonLinkConstraints=add_cannot_link_constraints)
-
-
-greedyGraphEdgeContraction.__doc__ = """
-GASP: generalized agglomeration for signed graph partition
-
-Accepted update rules:
- - 'mean'
- - 'max' (single linkage)
- - 'min' (complete linkage)
- - 'MutexWatershed' (abs-max)
- - 'sum'
- - {name: 'rank', q=0.5, numberOfBins=40}
- - {name: 'generalized_mean', p=2.0}   # 1.0 is mean
- - {name: 'smooth_max', p=2.0}   # 0.0 is mean
- """
