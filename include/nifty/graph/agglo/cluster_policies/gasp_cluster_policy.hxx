@@ -274,7 +274,7 @@ inline bool
 GaspClusterPolicy<GRAPH, UPDATE_RULE, ENABLE_UCM>::isDone(
 ){
     while(true) {
-        while(!pq_.empty() && !isNegativeInf(pq_.topPriority())){
+        while(!pq_.empty() && !isNegativeInf(pq_.topPriority()) && edgeContractionGraph_.numberOfNodes() > settings_.numberOfNodesStop){
             // Here we already know that the edge is not lifted
             // (Otherwise we would have inf cost in PQ)
             const auto nextActioneEdge = pq_.top();
