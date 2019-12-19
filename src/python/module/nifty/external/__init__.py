@@ -18,7 +18,8 @@ def generate_opensimplex_noise(shape, seed=None, features_size=1., number_of_thr
     :param features_size: Increase this value to get bigger spatially consistent features. Decrease it to get results
             similar to random Gaussian noise. Int or tuple
     """
-    if not isinstance(shape, list):
+    assert isinstance(shape, (list, tuple))
+    if isinstance(shape, tuple):
         shape = list(shape)
     ndims = len(shape)
 
@@ -28,7 +29,9 @@ def generate_opensimplex_noise(shape, seed=None, features_size=1., number_of_thr
     if isinstance(features_size, float):
         features_size = numpy.ones(ndims, dtype="float32") * features_size
     else:
-        assert isinstance(features_size, numpy.ndarray)
+        assert isinstance(features_size, (numpy.ndarray, tuple, list))
+        if not isinstance(features_size, numpy.ndarray):
+            features_size = numpy.array(features_size)
         assert features_size.shape[0] == ndims
 
     features_size = features_size.astype('float64')

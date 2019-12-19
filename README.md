@@ -4,7 +4,7 @@ Nifty
 ## Installation (Linux):
 
 #### Via Conda
-The easiest way to install this version is via conda (right now only available withour gurobi or cplex ):
+The easiest way to install this package is via conda (right now only available withour gurobi or cplex ):
 
 ```
 conda install -c abailoni nifty

@@ -15,6 +15,7 @@ import numpy
 from functools import partial
 import types
 import sys
+import warnings
 
 __all__ = []
 
@@ -163,7 +164,9 @@ def undirectedLongRangeGridGraph(shape, offsets, is_local_offset, offsets_probab
         assert mask_used_edges.ndim == 4
         mask_used_edges = numpy.rollaxis(mask_used_edges, axis=0, start=4)
         assert mask_used_edges.shape == randomProbsShape
-        randomProbs = mask_used_edges.astype('float32')
+        randomProbs = 1. - mask_used_edges.astype('float32')
+        if offsets_probabilities is not None:
+            warnings.warn("Offset probabilities are ignored when masked edges are passed")
 
     if offsets_probabilities is None:
         offsets_probabilities = numpy.ones((offsets.shape[0],), dtype='float')
@@ -219,6 +222,8 @@ def compute_lifted_edges_from_rag_and_offsets(rag,
         mask_used_edges = numpy.rollaxis(mask_used_edges, axis=0, start=4)
         assert mask_used_edges.shape == randomProbsShape, "{} {}".format(mask_used_edges.shape, randomProbsShape)
         randomProbs = mask_used_edges.astype('float32')
+        if offsets_probabilities is not None:
+            warnings.warn("Offset probabilities are ignored when masked edges are passed")
 
     if offsets_probabilities is None:
         offsets_probabilities = numpy.ones((offsets.shape[0],), dtype='float')

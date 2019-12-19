@@ -260,6 +260,15 @@ namespace graph{
             NIFTY_ASSERT(innerCallback_.edgesSet_.find(edgeToContract)!=innerCallback_.edgesSet_.end());
             cgraph_.contractEdge(edgeToContract);
         }
+
+        void insertEdge(
+                const uint64_t edgeToInsert,
+                const uint64_t u,
+                const uint64_t v
+        ) {
+            cgraph_.insertEdge(edgeToInsert, u, v);
+        }
+
         void reset(){
             cgraph_.reset();
             innerCallback_.initSets();
@@ -273,6 +282,9 @@ namespace graph{
         }
         uint64_t findRepresentativeNode(const uint64_t node){
             return cgraph_.findRepresentativeNode(node);
+        }
+        void insertNewEdgeInUfd(const uint64_t edge) {
+            cgraph_.insertNewEdgeInUfd(edge);
         }
         uint64_t findRepresentativeEdge(const uint64_t edge)const{
             return cgraph_.findRepresentativeEdge(edge);
@@ -304,12 +316,15 @@ namespace graph{
         class EdgeContractionGraphEdgeUfdHelper;
 
 
+        // CASE WITHOUT UNION FIND
         template<class GRAPH>
         class EdgeContractionGraphEdgeUfdHelper<GRAPH, false>{
         public:
             EdgeContractionGraphEdgeUfdHelper(const GRAPH & graph){
             }
 
+            void insertNewEdgeInUfd(const uint64_t edge){
+            }
 
 
         protected:
@@ -329,6 +344,9 @@ namespace graph{
             :   edgeUfd_(graph.edgeIdUpperBound()+1){
             }
 
+            void insertNewEdgeInUfd(const uint64_t edge){
+                edgeUfd_.insert(edge);
+                }
             uint64_t findRepresentativeEdge( const uint64_t edge)const{
                 return edgeUfd_.find(edge);
             }
@@ -406,6 +424,11 @@ namespace graph{
 
 
         void contractEdge(const uint64_t edgeToContract);
+        void insertEdge(
+                const uint64_t edgeToInsert,
+                const uint64_t u,
+                const uint64_t v
+        );
         void reset();
 
         const GraphType & baseGraph()const;
@@ -599,6 +622,32 @@ namespace graph{
         //     edges_[edge] = edgeStorage;
         // }            
     }
+
+    template<class GRAPH, class CALLBACK, bool WITH_EDGE_UFD>
+    inline void
+    EdgeContractionGraph<GRAPH, CALLBACK, WITH_EDGE_UFD>::
+    insertEdge(
+            const uint64_t edgeToInsert,
+            const uint64_t u,
+            const uint64_t v
+    ) {
+        //TODO: add more asserts (u not bigger than number of nodes, edge_id should be...
+        NIFTY_ASSERT(u != v);
+        ++currentEdgeNum_;
+
+        const auto fres =  nodes_[u].find(NodeAdjacency(v));
+        NIFTY_ASSERT(fres == nodes_[u].end());
+
+        const auto uu = std::min(u,v);
+        const auto vv = std::max(u,v);
+        nodes_[u].insert(NodeAdjacency(v,edgeToInsert));
+        nodes_[v].insert(NodeAdjacency(u,edgeToInsert));
+
+        if(WITH_EDGE_UFD) {
+            this->insertNewEdgeInUfd(edgeToInsert);
+        }
+    }
+
 
     template<class GRAPH, class CALLBACK, bool WITH_EDGE_UFD>
     inline void 

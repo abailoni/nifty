@@ -56,6 +56,7 @@ namespace graph{
 
             // modifications
             .def("contractEdge", &GraphType::contractEdge)
+            .def("insertEdge", &GraphType::insertEdge)
             .def("reset",&GraphType::reset)
 
 
