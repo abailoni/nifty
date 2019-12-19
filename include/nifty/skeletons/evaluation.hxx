@@ -2,8 +2,9 @@
 #include "boost/geometry/index/rtree.hpp"
 #include "boost/serialization/map.hpp"
 #include "boost/serialization/unordered_map.hpp"
-#include "boost/archive/binary_iarchive.hpp"
-#include "boost/archive/binary_oarchive.hpp"
+// can't build with boost serialization
+//#include "boost/archive/binary_iarchive.hpp"
+//#include "boost/archive/binary_oarchive.hpp"
 
 #include "nifty/z5/z5.hxx"
 #include "nifty/parallel/threadpool.hxx"
@@ -11,7 +12,16 @@
 namespace bg = boost::geometry;
 namespace bgi = boost::geometry::index;
 
-namespace fs = boost::filesystem;
+#ifdef WITH_BOOST_FS
+    namespace fs = boost::filesystem;
+#else
+    #if __GCC__ > 7
+        namespace fs = std::filesystem;
+    #else
+        namespace fs = std::experimental::filesystem;
+    #endif
+#endif
+
 namespace nifty {
 namespace skeletons {
 
@@ -50,7 +60,9 @@ namespace skeletons {
     // private members
     private:
         std::string segmentationPath_;
-        std::string skeletonTopFolder_;
+        std::string segmentationKey_;
+        std::string skeletonPath_;
+        std::string skeletonPrefix_;
         // we might consider holding this as a reference,
         // but for now this is so little data that a copy doesn't matter
         std::vector<std::size_t> skeletonIds_;
@@ -61,6 +73,8 @@ namespace skeletons {
     // API
     public:
 
+        // needs boost serialization
+        /*
         // constructor from serialization
         SkeletonMetrics(const std::string & segmentationPath,
                         const std::string & skeletonTopFolder,
@@ -70,13 +84,18 @@ namespace skeletons {
                                                                  skeletonIds_(skeletonIds){
             deserialize(dictSerialization);
         }
+        */
 
         // constructor from data
         SkeletonMetrics(const std::string & segmentationPath,
-                        const std::string & skeletonTopFolder,
+                        const std::string & segmentationKey,
+                        const std::string & skeletonPath,
+                        const std::string & skeletonPrefix,
                         const std::vector<std::size_t> & skeletonIds,
                         const int numberOfThreads) : segmentationPath_(segmentationPath),
-                                                     skeletonTopFolder_(skeletonTopFolder),
+                                                     segmentationKey_(segmentationKey),
+                                                     skeletonPath_(skeletonPath),
+                                                     skeletonPrefix_(skeletonPrefix),
                                                      skeletonIds_(skeletonIds){
             init(numberOfThreads);
         }
@@ -126,6 +145,9 @@ namespace skeletons {
         // the label id(s) that contain the merge
         void getNodesInFalseMergeLabels(std::map<std::size_t, std::vector<std::size_t>> &, const int) const;
 
+        // we can't build with boost::serialization right now
+        // best would be to reimplement this
+        /*
         // serialize and deserialize node dictionary with boost::serialization
         void serialize(const std::string & path) const {
             std::ofstream os(path.c_str(), std::ofstream::out | std::ofstream::binary);
@@ -138,6 +160,7 @@ namespace skeletons {
             boost::archive::binary_iarchive iarch(is);
             iarch >> skeletonDict_;
         }
+        */
 
         // group skeleton to blocks (= chunks of the segmentation)
         void groupSkeletonBlocks(SkeletonBlockStorage &, std::vector<std::size_t> &, parallel::ThreadPool &);
@@ -219,7 +242,8 @@ namespace skeletons {
         std::vector<std::size_t> zeroCoord = {0, 0};
 
         // open the segmentation dataset and get the shape and chunks
-        auto segmentation = z5::openDataset(segmentationPath_);
+        const z5::filesystem::handle::File file(segmentationPath_);
+        auto segmentation = z5::openDataset(file, segmentationKey_);
         const std::size_t nChunks = segmentation->numberOfChunks();
 
         // get chunk strides for conversion from n-dim chunk indices to
@@ -236,15 +260,14 @@ namespace skeletons {
         std::vector<SkeletonBlockStorage> perThreadData(nThreads);
 
         const auto & chunking = segmentation->chunking();
+        const z5::filesystem::handle::File skelFile(skeletonPath_);
 
         // go over all skeletons in parallel and extract the parts overlapping with chunks
         parallel::parallel_foreach(tp, nSkeletons, [&](const int tId, const std::size_t skeletonIndex){
             // open the coordinate dataset for this particular skeleton
             const std::size_t skeletonId = skeletonIds_[skeletonIndex];
-            fs::path skeletonPath(skeletonTopFolder_);
-            skeletonPath /= std::to_string(skeletonId);
-            skeletonPath /= "coordinates";
-            auto coordinateSet = z5::openDataset(skeletonPath.string());
+            const std::string skeletonKey = skeletonPrefix_ + "/" + std::to_string(skeletonId) + "/coordinates";
+            auto coordinateSet = z5::openDataset(skelFile, skeletonKey);
             const std::size_t nPoints = coordinateSet->shape(0);
             // load the coordinate data
             ArrayShape coordShape = {nPoints, coordinateSet->shape(1)};
@@ -356,7 +379,8 @@ namespace skeletons {
                                                                 const SkeletonStorage & skeletons,
                                                                 SkeletonDictionary & out) {
         // open the segmentation dataset and get the shape and chunks
-        auto segmentation = z5::openDataset(segmentationPath_);
+        const z5::filesystem::handle::File file(segmentationPath_);
+        auto segmentation = z5::openDataset(file, segmentationKey_);
         const std::size_t nChunks = segmentation->numberOfChunks();
 
         // we could do all that outside of the function only once,
@@ -451,6 +475,7 @@ namespace skeletons {
             splitEdges[skelId] = std::vector<bool>();
         }
 
+        const z5::filesystem::handle::File skelFile(skeletonPath_);
         // extract the split scores in parallel
         parallel::parallel_foreach(tp, nSkeletons, [&](const int tId, const std::size_t skeletonIndex){
             const std::size_t skeletonId = skeletonIds_[skeletonIndex];
@@ -458,10 +483,8 @@ namespace skeletons {
             auto & splitEdge = splitEdges[skeletonId];
 
             // load the skeleton edges
-            fs::path skeletonPath(skeletonTopFolder_);
-            skeletonPath /= std::to_string(skeletonId);
-            skeletonPath /= "edges";
-            auto edgeSet = z5::openDataset(skeletonPath.string());
+            const std::string skeletonKey = skeletonPrefix_ + "/" + std::to_string(skeletonId) + "/edges";
+            auto edgeSet = z5::openDataset(skelFile, skeletonKey);
             const std::size_t nEdges = edgeSet->shape(0);
 
             // load the edge data
@@ -551,6 +574,7 @@ namespace skeletons {
             mergeNodes[skelId] = std::set<std::pair<std::size_t, std::size_t>>();
         }
 
+        const z5::filesystem::handle::File skelFile(skeletonPath_);
         // extract the split scores in parallel
         parallel::parallel_foreach(tp, nSkeletons, [&](const int tId, const std::size_t skeletonIndex){
             const std::size_t skeletonId = skeletonIds_[skeletonIndex];
@@ -558,10 +582,8 @@ namespace skeletons {
             auto & mergeNode = mergeNodes[skeletonId];
 
             // load the skeleton edges
-            fs::path skeletonPath(skeletonTopFolder_);
-            skeletonPath /= std::to_string(skeletonId);
-            skeletonPath /= "edges";
-            auto edgeSet = z5::openDataset(skeletonPath.string());
+            const std::string skeletonKey = skeletonPrefix_ + "/" + std::to_string(skeletonId) + "/edges";
+            auto edgeSet = z5::openDataset(skelFile, skeletonKey);
             const std::size_t nEdges = edgeSet->shape(0);
 
             // load the edge data
@@ -620,6 +642,7 @@ namespace skeletons {
             fragmentRunlens[skeletonId] = std::map<std::size_t, double>();
         }
 
+        const z5::filesystem::handle::File skelFile(skeletonPath_);
         // iterate over the skelton ids in parallel
         // and extract the runlengths for the skeltons and the
         // fragments that have overlap with the skeleton
@@ -629,14 +652,10 @@ namespace skeletons {
             auto & fragLens = fragmentRunlens[skeletonId];
             const auto & nodeAssignments = skeletonDict_.at(skeletonId);
 
-            // path to the skeleton group
-            fs::path skeletonPath(skeletonTopFolder_);
-            skeletonPath /= std::to_string(skeletonId);
-
             // load the coordinates
-            fs::path coordinatePath(skeletonPath);
-            coordinatePath /= "coordinates";
-            auto coordinateSet = z5::openDataset(coordinatePath.string());
+            const std::string coordKey = skeletonPrefix_ + "/" + std::to_string(skeletonId) + "/coordinates";
+            auto coordinateSet = z5::openDataset(skelFile, coordKey);
+
             const std::size_t nPoints = coordinateSet->shape(0);
             ArrayShape coordShape = {nPoints, coordinateSet->shape(1)};
             CoordinateArray coords(coordShape);
@@ -649,9 +668,8 @@ namespace skeletons {
             }
 
             // load the edges
-            fs::path edgePath(skeletonPath);
-            edgePath /= "edges";
-            auto edgeSet = z5::openDataset(edgePath.string());
+            const std::string edgeKey = skeletonPrefix_ + "/" + std::to_string(skeletonId) + "/edges";
+            auto edgeSet = z5::openDataset(skelFile, edgeKey);
             const std::size_t nEdges = edgeSet->shape(0);
             ArrayShape edgeShape = {nEdges, edgeSet->shape(1)};
             CoordinateArray edges(edgeShape);
@@ -796,6 +814,7 @@ namespace skeletons {
             mergePoints[mergePair.first] = 0;
         }
 
+        const z5::filesystem::handle::File skelFile(skeletonPath_);
         // extract the merge edges in parallel
         parallel::parallel_foreach(tp, nSkeletons, [&](const int tId, const std::size_t skeletonIndex){
             const std::size_t skeletonId = skeletonIds_[skeletonIndex];
@@ -812,10 +831,8 @@ namespace skeletons {
             auto & mergeEdge = mergeEdges[skeletonId];
 
             // load the skeleton edges
-            fs::path skeletonPath(skeletonTopFolder_);
-            skeletonPath /= std::to_string(skeletonId);
-            skeletonPath /= "edges";
-            auto edgeSet = z5::openDataset(skeletonPath.string());
+            const std::string skeletonKey = skeletonPrefix_ + "/" + std::to_string(skeletonId) + "/edges";
+            auto edgeSet = z5::openDataset(skelFile, skeletonKey);
             const std::size_t nEdges = edgeSet->shape(0);
 
             // load the edge data
@@ -967,16 +984,15 @@ namespace skeletons {
             out[skelId] = TREE();
         }
 
+        const z5::filesystem::handle::File skelFile(skeletonPath_);
         parallel::parallel_foreach(tp, nSkeletons, [&](const int tId,
                                                         const std::size_t skeletonIndex){
             const std::size_t skeletonId = skeletonIds_[skeletonIndex];
             auto & tree = out[skeletonId];
 
             // load the coordinates
-            fs::path skeletonPath(skeletonTopFolder_);
-            skeletonPath /= std::to_string(skeletonId);
-            skeletonPath /= "coordinates";
-            auto coordinateSet = z5::openDataset(skeletonPath.string());
+            const std::string skeletonKey = skeletonPrefix_ + "/" + std::to_string(skeletonId) + "/coordinates";
+            auto coordinateSet = z5::openDataset(skelFile, skeletonKey);
             const std::size_t nPoints = coordinateSet->shape(0);
             ArrayShape coordShape = {nPoints, coordinateSet->shape(1)};
             CoordinateArray coords(coordShape);
@@ -1105,7 +1121,8 @@ namespace skeletons {
         getLabelsWithoutExplicitMerge(candidateLabels, tp);
 
         // open the segmentation dataset and get the shape and chunks
-        auto segmentation = z5::openDataset(segmentationPath_);
+        const z5::filesystem::handle::File file(segmentationPath_);
+        auto segmentation = z5::openDataset(file, segmentationKey_);
         const std::size_t nChunks = segmentation->numberOfChunks();
         // get chunk strides for conversion from n-dim chunk indices to
         // a flat chunk index
@@ -1225,7 +1242,8 @@ namespace skeletons {
         mapLabelsToSkeletons(candidateLabels, tp);
 
         // open the segmentation dataset and get the shape and chunks
-        auto segmentation = z5::openDataset(segmentationPath_);
+        const z5::filesystem::handle::File file(segmentationPath_);
+        auto segmentation = z5::openDataset(file, segmentationKey_);
         const std::size_t nChunks = segmentation->numberOfChunks();
         // get chunk strides for conversion from n-dim chunk indices to
         // a flat chunk index

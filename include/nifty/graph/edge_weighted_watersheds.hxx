@@ -142,19 +142,16 @@ namespace detail_watersheds_segmentation{
         const EDGE_WEIGHTS      & edgeWeights,
         const SEEDS             & seeds,
         LABELS                  & labels
-    ){  
+    ){
         typedef GRAPH GraphType;
         typedef typename EDGE_WEIGHTS::value_type WeightType;
         typedef typename LABELS::value_type  LabelType;
         //typedef typename Graph:: template EdgeMap<bool>    EdgeBoolMap;
-       
-
 
         for(auto node : g.nodes()){
             labels[node] = seeds[node];
         }
-        
-    
+
         typedef std::pair<uint64_t, WeightType> IndexedWeight;
         std::vector< IndexedWeight > indexedWeights(g.numberOfEdges());
 
@@ -164,13 +161,12 @@ namespace detail_watersheds_segmentation{
             ++c;
         }
 
-        // sort
-        std::sort(indexedWeights.begin(), indexedWeights.end(), 
+        // sort ascennding
+        std::sort(indexedWeights.begin(), indexedWeights.end(),
             [](const IndexedWeight & a, const IndexedWeight & b) {
-                return a.second < b.second;   
+                return a.second < b.second;
             }
-        ); 
-
+        );
 
         // merge
         nifty::ufd::Ufd<> ufd(g.nodeIdUpperBound()+1);
@@ -191,7 +187,7 @@ namespace detail_watersheds_segmentation{
                 const auto lv = labels[rv];
 
                 if( lu==0 || lv==0){
-                    
+
                     auto newLabel = std::max(lu, lv);
                     ufd.merge(u,v);
                     labels[u] = newLabel;
@@ -209,12 +205,12 @@ namespace detail_watersheds_segmentation{
 
 
 
-} // end namespace detail_watersheds_segmentation 
+} // end namespace detail_watersheds_segmentation
 
 // \endcond
 
     /// \brief edge weighted watersheds Segmentataion
-    /// 
+    ///
     /// \param g: input graph
     /// \param edgeWeights : edge weights / edge indicator
     /// \param seeds : seed must be non empty!
@@ -225,17 +221,16 @@ namespace detail_watersheds_segmentation{
         const EDGE_WEIGHTS & edgeWeights,
         const SEEDS        & seeds,
         LABELS             & labels
-    ){  
+    ){
         detail_watersheds_segmentation::edgeWeightedWatershedsSegmentationKruskalImpl(
             g,edgeWeights,seeds,labels);
-        
         //detail_watersheds_segmentation::RawPriorityFunctor fPriority;
         //detail_watersheds_segmentation::edgeWeightedWatershedsSegmentationImpl(g,edgeWeights,seeds,fPriority,labels);
-    }   
-    
+    }
+
 
     /// \brief edge weighted watersheds Segmentataion
-    /// 
+    ///
     /// \param g: input graph
     /// \param edgeWeights : edge weights / edge indicator
     /// \param seeds : seed must be non empty!

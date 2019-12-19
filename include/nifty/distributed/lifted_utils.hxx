@@ -7,7 +7,15 @@
 #include "nifty/distributed/graph_extraction.hxx"
 #include "nifty/distributed/distributed_graph.hxx"
 
-namespace fs = boost::filesystem;
+#ifdef WITH_BOOST_FS
+    namespace fs = boost::filesystem;
+#else
+    #if __GCC__ > 7
+        namespace fs = std::filesystem;
+    #else
+        namespace fs = std::experimental::filesystem;
+    #endif
+#endif
 
 namespace nifty {
 namespace distributed {
@@ -68,12 +76,14 @@ namespace distributed {
     }
 
 
-    template<class NODE_LABELS>
+    template<class NODE_LABELS, class F>
     inline void findLiftedEdgesBfs(const Graph & graph,
                                    const uint64_t srcNode,
                                    const NODE_LABELS & nodeLabels,
                                    const unsigned graphDepth,
-                                   std::vector<EdgeType> & out) {
+                                   std::vector<EdgeType> & out,
+                                   F && addEdge,
+                                   const uint64_t ignoreLabel=0) {
         // type to put on bfs queue, stores the node id and the graph
         // distance of this node from the start node
         typedef std::pair<uint64_t, unsigned> QueueElem;
@@ -84,6 +94,7 @@ namespace distributed {
         std::queue<QueueElem> queue;
 
         queue.emplace(std::make_pair(srcNode, 0));
+        const uint64_t srcLabel = nodeLabels[srcNode];
 
         while(queue.size()) {
             const QueueElem elem = queue.front();
@@ -105,79 +116,150 @@ namespace distributed {
             // put the neighboring nodes on the queue
             // (only if we wouldn't exceed max node depth )
             if(depth < graphDepth) {
-                const auto & adj = graph.nodeAdjacency(node);
-                for(const auto & ngb: adj) {
-                    // put node on queue if it has not been visited already
-                    const uint64_t ngbNode = ngb.first;
-                    if(visited.find(ngbNode) == visited.end()) {
-                        queue.emplace(std::make_pair(ngbNode, depth + 1));
+                // FIXME map can get out of scope, I don't understand why
+                try {
+                    const auto & adj = graph.nodeAdjacency(node);
+                    for(const auto & ngb: adj) {
+                        // put node on queue if it has not been visited already
+                        const uint64_t ngbNode = ngb.first;
+                        if(visited.find(ngbNode) == visited.end()) {
+                            queue.emplace(std::make_pair(ngbNode, depth + 1));
+                        }
                     }
+                } catch(std::out_of_range exception) {
+                    continue;
                 }
             }
 
             // check if we make a lifted edge between the start node and this node:
-            // is this a lifted edge? i.e. graph depth > 1
+            // 1.) is this a lifted edge? i.e. graph depth > 1
             const bool isLiftedEdge = depth > 1;
-            // does the node have a label?
-            const uint64_t label = nodeLabels[node];
-            // is the node's id bigger than srcNode? (otherwise edges would be redundant)
-            if(isLiftedEdge && label > 0 && srcNode < node) {
-                out.emplace_back(std::make_pair(srcNode, node));
+            if(depth <= 1) {
+                continue;
             }
+
+            // 2.) does the node have a label?
+            const uint64_t label = nodeLabels[node];
+            if(label == ignoreLabel) {
+                continue;
+            }
+
+            // 3.) is srcNode < node? (make sure not to duplicate lifted edges)
+            if(srcNode > node) {
+                continue;
+            }
+
+            // 4) additional lifted check dependend on the node labels
+            if(!addEdge(srcLabel, label)) {
+                continue;
+            }
+
+            // all checks passed ? -> add the lifted edges
+            out.emplace_back(std::make_pair(srcNode, node));
         }
     }
 
 
-    inline void computeLiftedNeighborhoodFromNodeLabels(const std::string & graphPath,
-                                                        const std::string & nodeLabelPath,
-                                                        const std::string & outputPath,
-                                                        const unsigned graphDepth,
-                                                        const int numberOfThreads) {
-        // load the graph
-        const auto graph = Graph(graphPath, numberOfThreads);
+    inline bool addAll(const uint64_t labelA, const uint64_t labelB) {
+        return true;
+    }
 
+
+    inline bool addSame(const uint64_t labelA, const uint64_t labelB) {
+        return labelA == labelB;
+    }
+
+
+    inline bool addDifferent(const uint64_t labelA, const uint64_t labelB) {
+        return labelA != labelB;
+    }
+
+    template<class NODE_LABELS>
+    inline void computeLiftedNeighborhoodFromNodeLabels(const Graph & graph,
+                                                        const NODE_LABELS & nodeLabels,
+                                                        const int graphDepth,
+                                                        const int numberOfThreads,
+                                                        std::vector<EdgeType> & out,
+                                                        const std::string & mode="all",
+                                                        const uint64_t ignoreLabel=0) {
+        // modes can be
+        // "all": add all edges between nodes with a label
+        // "same": add edges only between nodes with the same label
+        // "different": add edges only between nodes with different labels
+        auto edgeChecker = (mode=="all") ? addAll : ((mode=="same") ? addSame : addDifferent);
+
+        // per thread data: store lifted edges for each thread
+        out.clear();
+        std::vector<std::vector<EdgeType>> perThreadData(numberOfThreads - 1);
+
+        // find lifted edges via bfs starting from each node. (in parallel)
+        // only add edges if both nodes have a node label
+        const std::size_t nNodes = graph.numberOfNodes();
+        nifty::parallel::parallel_foreach(numberOfThreads, nNodes,
+                                          [&](const int tid, const uint64_t nodeId){
+            // zero is usually not in graph
+            // TODO should do a proper check instead ...
+            if(nodeId == 0) {
+                return;
+            }
+
+            // check if this node has a node label
+            const uint64_t nodeLabel = nodeLabels[nodeId];
+            // continue if it is unlabeled
+            if(nodeLabel == ignoreLabel) {
+                return;
+            }
+            auto & threadData = (tid == 0) ? out : perThreadData[tid - 1];
+            // do bfs for this node and find all relevant lifted edges
+            findLiftedEdgesBfs(graph, nodeId,
+                               nodeLabels, graphDepth, threadData,
+                               edgeChecker, ignoreLabel);
+        });
+
+        // merge the thread
+        std::size_t nLifted = out.size();
+        for(int tid = 0; tid < numberOfThreads - 1; ++tid) {
+            nLifted += perThreadData[tid].size();
+        }
+        out.reserve(nLifted);
+        for(int tid = 0; tid < numberOfThreads - 1; ++tid) {
+            const auto & src = perThreadData[tid];
+            out.insert(out.end(), src.begin(), src.end());
+        }
+        // sort lifted edges by node ids
+        std::sort(out.begin(), out.end());
+    }
+
+    inline void computeLiftedNeighborhoodFromNodeLabels(const std::string & graphPath,
+                                                        const std::string & graphKey,
+                                                        const std::string & nodeLabelPath,
+                                                        const std::string & nodeLabelKey,
+                                                        const std::string & outputPath,
+                                                        const std::string & outputKey,
+                                                        const int graphDepth,
+                                                        const int numberOfThreads,
+                                                        const std::string & mode="all",
+                                                        const uint64_t ignoreLabel=0) {
         // load the node labels
-        auto nodeDs = z5::openDataset(nodeLabelPath);
+        const z5::filesystem::handle::File nodeLabelFile(nodeLabelPath);
+        auto nodeDs = z5::openDataset(nodeLabelFile, nodeLabelKey);
         const std::size_t nNodes = nodeDs->shape(0);
         const std::vector<std::size_t> zero1Coord({0});
         Shape1Type nodeShape({nNodes});
         Tensor1 nodeLabels(nodeShape);
         z5::multiarray::readSubarray<uint64_t>(nodeDs, nodeLabels, zero1Coord.begin());
 
-        // per thread data: store lifted edges for each thread
-        std::vector<std::vector<EdgeType>> perThreadData(numberOfThreads);
+        // load the graph
+        const auto graph = Graph(graphPath, graphKey, numberOfThreads);
 
-        // find lifted edges via bfs starting from each node. (in parallel)
-        // only add edges if both nodes have a node label
-        nifty::parallel::parallel_foreach(numberOfThreads, nNodes,
-                                          [&](const int tid, const uint64_t nodeId){
-            // check if this node has a node label
-            const uint64_t nodeLabel = nodeLabels[nodeId];
-            // continue if it is unlabeled
-            if(nodeLabel == 0) {
-                return;
-            }
-            auto & threadData = perThreadData[tid];
-            // do bfs for this node and find all relevant lifted edges
-            findLiftedEdgesBfs(graph, nodeId,
-                               nodeLabels, graphDepth, threadData);
-        });
-
-        // merge the thread
-        std::size_t nLifted = 0;
-        for(int tid = 0; tid < numberOfThreads; ++tid) {
-            nLifted += perThreadData[tid].size();
-        }
-        auto & liftedEdges = perThreadData[0];
-        liftedEdges.reserve(nLifted);
-        for(int tid = 1; tid < numberOfThreads; ++tid) {
-            const auto & src = perThreadData[tid];
-            liftedEdges.insert(liftedEdges.end(), src.begin(), src.end());
-        }
-        // sort lifted edges by node ids
-        std::sort(liftedEdges.begin(), liftedEdges.end());
+        // call the extraction function
+        std::vector<EdgeType> liftedEdges;
+        computeLiftedNeighborhoodFromNodeLabels(graph, nodeLabels,
+                                                graphDepth, numberOfThreads,
+                                                liftedEdges, mode, ignoreLabel);
 
         // serialize
+        const std::size_t nLifted = liftedEdges.size();
         Shape2Type outShape = {nLifted, 2};
         xt::xtensor<uint64_t, 2> out(outShape);
 
@@ -189,9 +271,10 @@ namespace distributed {
 
         std::vector<std::size_t> dsShape = {nLifted, 2};
         std::vector<std::size_t> dsChunks = {std::min(static_cast<std::size_t>(64*64*64), nLifted), 1};
-        auto dsOut = z5::createDataset(outputPath, "uint64",
-                                       dsShape, dsChunks, false,
-                                       "gzip");
+
+        const z5::filesystem::handle::File outputFile(outputPath);
+        auto dsOut = z5::createDataset(outputFile, outputKey, "uint64",
+                                       dsShape, dsChunks, "gzip");
         const std::vector<std::size_t> zero2Coord = {0, 0};
         z5::multiarray::writeSubarray<uint64_t>(dsOut, out, zero2Coord.begin(), numberOfThreads);
     }

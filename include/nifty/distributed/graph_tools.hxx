@@ -9,22 +9,22 @@
 #include "nifty/distributed/distributed_graph.hxx"
 #include "nifty/tools/blocking.hxx"
 
-namespace fs = boost::filesystem;
 
 namespace nifty {
 namespace distributed {
 
 
     inline void loadNiftyGraph(const std::string & graphPath,
+                               const std::string & graphKey,
                                nifty::graph::UndirectedGraph<> & g,
                                std::unordered_map<NodeType, NodeType> & relabeling,
                                const bool relabelNodes=true) {
         std::vector<NodeType> nodes;
-        loadNodes(graphPath, nodes, 0);
+        loadNodes(graphPath, graphKey, nodes, 0);
         const std::size_t nNodes = nodes.size();
 
         std::vector<EdgeType> edges;
-        loadEdges(graphPath, edges, 0);
+        loadEdges(graphPath, graphKey, edges, 0);
         const std::size_t nEdges = edges.size();
 
         if(relabelNodes) {
@@ -50,13 +50,17 @@ namespace distributed {
 
 
     inline void nodeLabelingToPixels(const std::string & labelsPath,
+                                     const std::string & labelsKey,
                                      const std::string & outPath,
+                                     const std::string & outKey,
                                      const xt::xtensor<NodeType, 1> & nodeLabeling,
                                      const std::vector<std::size_t> & blockIds,
                                      const std::vector<std::size_t> & blockShape) {
         // in and out dataset
-        auto labelDs = z5::openDataset(labelsPath);
-        auto outDs = z5::openDataset(outPath);
+        const z5::filesystem::handle::File labelsFile(labelsPath);
+        auto labelDs = z5::openDataset(labelsFile, labelsKey);
+        const z5::filesystem::handle::File outFile(outPath);
+        auto outDs = z5::openDataset(outFile, outKey);
         Shape3Type arrayShape = {blockShape[0], blockShape[1], blockShape[2]};
         xt::xtensor<NodeType, 3> labels(arrayShape);
 
@@ -103,13 +107,15 @@ namespace distributed {
 
     // FIXME this sometimes fails with a floating point exception, but not really reproducible
     template<class NODE_ARRAY, class EDGE_ARRAY>
-    inline void serializeMergedGraph(const std::string & graphBlockPrefix,
+    inline void serializeMergedGraph(const std::string & graphPath,
+                                     const std::string & graphBlockPrefix,
                                      const CoordType & shape,
                                      const CoordType & blockShape,
                                      const CoordType & newBlockShape,
                                      const std::vector<std::size_t> & newBlockIds,
                                      const xt::xexpression<NODE_ARRAY> & nodeLabelingExp,
                                      const xt::xexpression<EDGE_ARRAY> & edgeLabelingExp,
+                                     const std::string & outPath,
                                      const std::string & graphOutPrefix,
                                      const int numberOfThreads,
                                      const bool serializeEdges) {
@@ -125,6 +131,8 @@ namespace distributed {
         nifty::tools::Blocking<3> newBlocking(roiBegin, shape, newBlockShape);
 
         const std::size_t numberOfNewBlocks = newBlockIds.size();
+        const z5::filesystem::handle::File graphFile(graphPath);
+        const z5::filesystem::handle::File outFile(outPath);
 
         // serialize the merged sub-graphs
         const std::vector<std::size_t> zero1Coord({0});
@@ -142,31 +150,31 @@ namespace distributed {
 
             // iterate over the old blocks and find all nodes
             for(auto oldBlockId : oldBlockIds) {
-                const std::string blockPath = graphBlockPrefix + std::to_string(oldBlockId);
+                const std::string blockKey = graphBlockPrefix + std::to_string(oldBlockId);
+                const z5::filesystem::handle::Group graph(graphFile, blockKey);
 
                 // if we are dealing with region of interests, the sub-graph might actually not exist
                 // so we need to check and skip if it does not exist.
-                if(!fs::exists(blockPath)) {
+                if(!graph.exists()) {
                     continue;
                 }
 
                 std::vector<NodeType> blockNodes;
-                loadNodes(blockPath, blockNodes, 0);
+                loadNodes(graph, blockNodes, 0);
                 for(const NodeType node : blockNodes) {
                     newBlockNodes.insert(nodeLabeling(node));
                 }
             }
 
             // create the out group
-            const std::string outPath = graphOutPrefix + std::to_string(blockId);
-            z5::handle::Group group(outPath);
-            z5::createGroup(group, false);
+            const std::string outKey = graphOutPrefix + std::to_string(blockId);
+            z5::createGroup(outFile, outKey);
+            z5::filesystem::handle::Group group(outFile, outKey);
 
             // serialize the new nodes
             const std::size_t nNewNodes = newBlockNodes.size();
             std::vector<std::size_t> nodeShape = {nNewNodes};
-            auto dsNodes = z5::createDataset(group, "nodes", "uint64",
-                                             nodeShape, nodeShape, false);
+            auto dsNodes = z5::createDataset(group, "nodes", "uint64", nodeShape, nodeShape);
             Shape1Type nodeSerShape = {nNewNodes};
             Tensor1 nodeSer(nodeSerShape);
             std::size_t i = 0;
@@ -187,18 +195,19 @@ namespace distributed {
             // iterate over the old blocks and load all edges and edge ids
             std::map<EdgeIndexType, EdgeType> newEdges;
             for(auto oldBlockId : oldBlockIds) {
-                const std::string blockPath = graphBlockPrefix + std::to_string(oldBlockId);
+                const std::string blockKey = graphBlockPrefix + std::to_string(oldBlockId);
+                const z5::filesystem::handle::Group graph(graphFile, blockKey);
 
                 // if we are dealing with region of interests, the sub-graph might actually not exist
                 // so we need to check and skip if it does not exist.
-                if(!fs::exists(blockPath)) {
+                if(!graph.exists()) {
                     continue;
                 }
 
                 std::vector<EdgeType> subEdges;
                 std::vector<EdgeIndexType> subEdgeIds;
-                loadEdges(blockPath, subEdges, 0);
-                loadEdgeIndices(blockPath, subEdgeIds, 0);
+                loadEdges(graph, subEdges, 0);
+                loadEdgeIndices(graph, subEdgeIds, 0);
 
                 // map edges and edge ids to the merged graph and serialize
                 for(std::size_t ii = 0; ii < subEdges.size(); ++ii) {
@@ -232,14 +241,12 @@ namespace distributed {
 
                 // serialize the edges
                 std::vector<std::size_t> edgeShape = {nNewEdges, 2};
-                auto dsEdges = z5::createDataset(group, "edges", "uint64",
-                                                 edgeShape, edgeShape, false);
+                auto dsEdges = z5::createDataset(group, "edges", "uint64", edgeShape, edgeShape);
                 z5::multiarray::writeSubarray<NodeType>(dsEdges, edgeSer, zero2Coord.begin());
 
                 // serialize the edge ids
                 std::vector<std::size_t> edgeIdShape = {nNewEdges};
-                auto dsEdgeIds = z5::createDataset(group, "edgeIds", "int64",
-                                                   edgeIdShape, edgeIdShape, false);
+                auto dsEdgeIds = z5::createDataset(group, "edgeIds", "int64", edgeIdShape, edgeIdShape);
                 z5::multiarray::writeSubarray<EdgeIndexType>(dsEdgeIds, edgeIdSer,
                                                              zero1Coord.begin());
             }
@@ -258,7 +265,8 @@ namespace distributed {
 
     // we have to look at surprisingly many blocks, which makes
     // this function pretty inefficient
-    // FIXME I am not 100 % sure if this is not due to some bug
+    // FIXME I am not 100 % sure if this is due to some bug
+    /*
     template<class NODE_ARRAY>
     inline void extractSubgraphFromNodes(const xt::xexpression<NODE_ARRAY> & nodesExp,
                                          const std::string & graphBlockPrefix,
@@ -377,21 +385,37 @@ namespace distributed {
             }
         }
     }
+    */
 
 
-    template<class EDGES, class NODES>
-    void connectedComponents(const Graph & graph,
-                             const xt::xexpression<EDGES> & edges_exp,
-                             const bool ignoreLabel,
-                             xt::xexpression<NODES> & labels_exp) {
-        const auto & edges = edges_exp.derived_cast();
-        auto & labels = labels_exp.derived_cast();
+    // number of nodes taking care of paintera ignore id BS
+    std::size_t getNumberOfNodes(const Graph & graph) {
+        uint64_t maxNode = graph.maxNodeId();
+        if(maxNode == std::numeric_limits<uint64_t>::max()) {
+            // need to find the second largest node
+            std::vector<NodeType> nodes;
+            graph.nodes(nodes);
+            std::nth_element(nodes.begin(), nodes.begin() + 1, nodes.end(),
+                             std::greater<NodeType>());
+            maxNode = nodes[1];
+        }
+        return maxNode + 1;
+    }
 
-        std::vector<NodeType> nodes;
-        graph.nodes(nodes);
 
-        // we need the number of nodes if nodes were dense
-        const std::size_t nNodes = graph.nodeMaxId() + 1;
+    // this should also work in-place, i.e. just with a single node labeling
+    // but right now it's too hot for me to figure this out
+    // connected components from node labels
+    template<class NODES> void connectedComponentsFromNodes(const Graph & graph,
+                                                            const xt::xexpression<NODES> & labels_exp,
+                                                            const bool ignoreLabel,
+                                                            xt::xexpression<NODES> & out_exp) {
+        const auto & labels = labels_exp.derived_cast();
+        auto & out = out_exp.derived_cast();
+        const std::size_t nNodes = getNumberOfNodes(graph);
+
+        // for hacky paintera fix
+        const uint64_t painteraId = std::numeric_limits<uint64_t>::max();
 
         // make union find
         std::vector<NodeType> rank(nNodes);
@@ -401,53 +425,68 @@ namespace distributed {
             sets.make_set(node_id);
         }
 
-        // First pass:
-        // iterate over each node and create new label at node
-        // or assign representative of the neighbor node
-        NodeType currentLabel = 0;
-        for(const NodeType node : nodes){
-
-            if(ignoreLabel && (node == 0)) {
+        const auto & edges = graph.edges();
+        for(const auto & edge: edges) {
+            const uint64_t u = edge.first;
+            const uint64_t v = edge.second;
+            // this is a hacky fix to deal with paintera
+            if((u == painteraId) || (v == painteraId)) {
                 continue;
             }
 
-            // iterate over the nodes in the neighborhood
-            // and collect the nodes that are connected
-            const auto & nhood = graph.nodeAdjacency(node);
-            std::set<NodeType> ngbLabels;
-            for(auto nhIt = nhood.begin(); nhIt != nhood.end(); ++nhIt) {
-                const NodeType nhNode = nhIt->first;
-                const EdgeIndexType nhEdge = nhIt->second;
 
-                // nodes are connected if the edge has the value 0
-                // this is in accordance with cut edges being 1
-                if(!edges(nhEdge)) {
-                    ngbLabels.insert(nhNode);
-                }
+            const uint64_t lU = labels(u);
+            const uint64_t lV = labels(v);
+            if(ignoreLabel && (lU == 0 || lV == 0)) {
+                continue;
             }
-
-            // check if we are connected to any of the neighbors
-            // and if the neighbor labels need to be merged
-            if(ngbLabels.size() == 0) {
-                // no connection -> make new label @ current pixel
-                labels(node) = ++currentLabel;
-            } else if (ngbLabels.size() == 1) {
-                // only single label -> we assign its representative to the current pixel
-                labels(node) = sets.find_set(*ngbLabels.begin());
-            } else {
-                // multiple labels -> we merge them and assign representative to the current pixel
-                std::vector<NodeType> tmp_labels(ngbLabels.begin(), ngbLabels.end());
-                for(unsigned ii = 1; ii < tmp_labels.size(); ++ii) {
-                    sets.link(tmp_labels[ii - 1], tmp_labels[ii]);
-                }
-                labels(node) = sets.find_set(tmp_labels[0]);
+            if(lU == lV) {
+                sets.link(u, v);
             }
         }
 
-        // Second pass:
-        // Assign representative to each pixel
-        for(const NodeType node : nodes){
-            labels(node) = sets.find_set(labels(node));
+        // assign representative to each pixel
+        for(std::size_t u = 0; u < out.size(); ++u){
+            out(u) = sets.find_set(u);
+        }
+    }
+
+
+    // connected components from edge labels
+    template<class EDGES, class NODES>
+    void connectedComponents(const Graph & graph,
+                             const xt::xexpression<EDGES> & edges_exp,
+                             xt::xexpression<NODES> & labels_exp) {
+        const auto & edgeLabels = edges_exp.derived_cast();
+        auto & labels = labels_exp.derived_cast();
+
+        // we need the number of nodes if nodes were dense
+        const std::size_t nNodes = getNumberOfNodes(graph);
+
+        // make union find
+        std::vector<NodeType> rank(nNodes);
+        std::vector<NodeType> parent(nNodes);
+        boost::disjoint_sets<NodeType*, NodeType*> sets(&rank[0], &parent[0]);
+        for(NodeType node_id = 0; node_id < nNodes; ++node_id) {
+            sets.make_set(node_id);
+        }
+
+        const auto & edges = graph.edges();
+        for(std::size_t edge_id = 0; edge_id < edges.size(); ++edge_id) {
+            const auto & edge = edges[edge_id];
+            const uint64_t u = edge.first;
+            const uint64_t v = edge.second;
+
+            // nodes are connected if the edge has the value 0
+            // this is in accordance with cut edges being 1
+            if(!edgeLabels(edge_id)) {
+                sets.link(u, v);
+            }
+        }
+
+        // assign representative to each pixel
+        for(std::size_t u = 0; u < labels.size(); ++u){
+            labels(u) = sets.find_set(u);
         }
     }
 

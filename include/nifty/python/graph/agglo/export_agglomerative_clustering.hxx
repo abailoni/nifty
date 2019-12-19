@@ -4,10 +4,8 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 
-#include "nifty/python/converter.hxx"
 #include "nifty/python/graph/undirected_list_graph.hxx"
 #include "nifty/graph/agglo/agglomerative_clustering.hxx"
-
 
 #include <xtensor/xtensor.hpp>
 #include <xtensor/xlayout.hpp>
@@ -24,7 +22,6 @@ namespace agglo{
 
 
     //using namespace py;
-    
     template<bool WITH_UCM>
     struct ExportUcmFunctions{
         template<class AGGLO_CLUSTER_TYPE>
@@ -37,16 +34,19 @@ namespace agglo{
     struct ExportUcmFunctions<true>{
         template<class AGGLO_CLUSTER_TYPE>
         void static exportUcm(py::class_<AGGLO_CLUSTER_TYPE> & aggloCls){
-            
+
             typedef typename AGGLO_CLUSTER_TYPE::GraphType GraphType;
             typedef typename GraphType:: template EdgeMap<double> EdgeMapFloat64;
 
             aggloCls
+
                 .def("runAndGetMergeTimes", [](
                     AGGLO_CLUSTER_TYPE * self, const bool verbose
                 ){
                     const auto & graph = self->graph();
-                    xt::pytensor<uint64_t, 1> mtimes = xt::zeros<uint64_t>({std::size_t(graph.edgeIdUpperBound()+1)});
+                    typedef typename xt::pytensor<uint64_t, 1>::shape_type ShapeType;
+                    ShapeType shape = {graph.edgeIdUpperBound() + 1};
+                    xt::pytensor<uint64_t, 1> mtimes = xt::zeros<uint64_t>(shape);
                     {
                         py::gil_scoped_release allowThreads;
                         self->runAndGetMergeTimes(mtimes, verbose);
@@ -60,16 +60,16 @@ namespace agglo{
                     AGGLO_CLUSTER_TYPE * self, const bool verbose
                 ){
                     const auto & graph = self->graph();
-                    xt::pytensor<double, 1> dheight = xt::zeros<double>( {std::size_t(graph.edgeIdUpperBound()+1)  });
-                    xt::pytensor<uint64_t, 1> mtimes = xt::zeros<uint64_t>( {std::size_t(graph.edgeIdUpperBound()+1)  });
+                    typedef typename xt::pytensor<uint64_t, 1>::shape_type ShapeType;
+                    ShapeType shape = {graph.edgeIdUpperBound() + 1};
+
+                    xt::pytensor<double, 1> dheight = xt::zeros<double>(shape);
+                    xt::pytensor<uint64_t, 1> mtimes = xt::zeros<uint64_t>(shape);
                     {
                         py::gil_scoped_release allowThreads;
                         self->runAndGetMergeTimesAndDendrogramHeight(mtimes, dheight,verbose);
                     }
-                    return std::pair<
-                        xt::pytensor<uint64_t, 1>,
-                        xt::pytensor<double, 1>
-                    >(mtimes, dheight);
+                    return std::make_pair(mtimes, dheight);
                 }
                 ,
                     py::arg("verbose") = false
@@ -79,7 +79,9 @@ namespace agglo{
                     AGGLO_CLUSTER_TYPE * self, const bool verbose
                 ){
                     const auto & graph = self->graph();
-                    xt::pytensor<double, 1> dheight( {std::size_t(graph.edgeIdUpperBound()+1)  });
+                    typedef typename xt::pytensor<double, 1>::shape_type ShapeType;
+                    ShapeType shape = {graph.edgeIdUpperBound() + 1};
+                    xt::pytensor<double, 1> dheight = xt::zeros<double>(shape);
                     {
                         py::gil_scoped_release allowThreads;
                         self->runAndGetDendrogramHeight(dheight,verbose);
@@ -95,7 +97,9 @@ namespace agglo{
                     const EdgeMapFloat64 & edgeValues
                 ){
                     const auto & graph = self->graph();
-                    xt::pytensor<double, 1> transformed = xt::zeros<double>( {std::size_t(graph.edgeIdUpperBound()+1)  });
+                    typedef typename xt::pytensor<double, 1>::shape_type ShapeType;
+                    ShapeType shape = {graph.edgeIdUpperBound() + 1};
+                    xt::pytensor<double, 1> transformed = xt::zeros<double>(shape);
                     {
                         py::gil_scoped_release allowThreads;
                         self->ucmTransform(edgeValues, transformed);
@@ -162,9 +166,7 @@ namespace agglo{
                         ++c;
                     }
                     // std::cout<<"d\n";
-                        
                     return std::make_tuple(nodes, p, s);
-
                 })
             ;
 
@@ -225,19 +227,8 @@ namespace agglo{
         const auto clusterPolicyClsName = clusterPolicyBaseName + graphName;
         const auto aggloClsName = std::string("AgglomerativeClustering") + clusterPolicyClsName;
 
-
-
-
-
-
-
-
-
-
-        // the agglomerative cluster policy itself 
+        // the agglomerative cluster policy itself
         auto aggloCls = py::class_<AgglomerativeClusteringType>(aggloModule, aggloClsName.c_str());
-
-        aggloCls.def_property_readonly("graph", &AgglomerativeClusteringType::graph);
 
         aggloCls
             .def("run", [](
@@ -254,11 +245,14 @@ namespace agglo{
                 py::arg("verbose") = false,
                 py::arg("printNth") = 1
             )
+
             .def("result", [](
                 const AgglomerativeClusteringType * self
             ){
                 const auto graph = self->graph();
-                xt::pytensor<uint64_t, 1> out = xt::zeros<uint64_t>({size_t(graph.nodeIdUpperBound()+1)});
+                typedef typename xt::pytensor<uint64_t, 1>::shape_type ShapeType;
+                ShapeType shape = {graph.nodeIdUpperBound() + 1};
+                xt::pytensor<uint64_t, 1> out(shape);
                 {
                     py::gil_scoped_release allowThreds;
                     self->result(out);
@@ -269,7 +263,7 @@ namespace agglo{
 
             .def("result", [](
                 const AgglomerativeClusteringType * self,
-                xt::pytensor<uint64_t, 1> out 
+                xt::pytensor<uint64_t, 1> & out
             ){
                 const auto graph = self->graph();
                 {
@@ -287,7 +281,7 @@ namespace agglo{
 
 
 
-        // additional functions which are only enabled if 
+        // additional functions which are only enabled if
         // cluster policies enables ucm
         typedef ExportUcmFunctions<AgglomerativeClusteringType::WithEdgeUfd::value> UcmExporter;
         UcmExporter::exportUcm(aggloCls);
