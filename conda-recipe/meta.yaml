@@ -25,7 +25,7 @@ source:
 
 
 build:
-  number: 3
+  number: 5
 
   script_env:
      - WITH_CPLEX
@@ -38,7 +38,7 @@ build:
 requirements:
   build:
     - gxx_linux-64
-    - python {{PY_VER}}*
+    - python {{PY_VER}}
     - boost-cpp >=1.63
     - hdf5 >=1.10
     - numpy >=1.15
@@ -46,8 +46,9 @@ requirements:
     - xtensor-python 0.22.1
     - nlohmann_json
     - blosc
-    - z5py
+    - z5py >=2
     - vigra
+    # - bzip2
 
     {% if WITH_CPLEX is defined and WITH_CPLEX %}
     - cplex-shared # Need to make sure that cplex dylibs exist
@@ -59,14 +60,13 @@ requirements:
     {% endif %}
 
   run:
-    - python {{PY_VER}}*
-    - boost 1.68.0
+    - python {{PY_VER}}
     - hdf5 >=1.10
     - numpy >=1.15
     - scikit-image
-    - bzip2
     - blosc
     - vigra
+    # - bzip2
 
     {% if WITH_CPLEX is defined and WITH_CPLEX %}
     - cplex-shared # Need to make sure that cplex dylibs exist
