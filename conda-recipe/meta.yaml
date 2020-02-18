@@ -18,14 +18,14 @@ package:
   {% else %}
     name: nifty
   {% endif %}
-    version: v1.0.7
+    version: vplantseg1.0.8
 
 source:
   path: ..
 
 
 build:
-  number: 5
+  number: 0
 
   script_env:
      - WITH_CPLEX
