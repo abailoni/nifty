@@ -23,9 +23,15 @@ conda install -c abailoni nifty
 ### Travis (Ubuntu builds)
 Master: [![Build Status master](https://travis-ci.org/constantinpape/nifty.svg?branch=master)](https://travis-ci.org/DerThorsten/nifty)
 
-### Appveyor (Windows builds)
+Appveyor (Windows builds)
+---------------------------------
 Master: 
 [![Build status](https://ci.appveyor.com/api/projects/status/u6nfcpfhpyya5mk8/branch/master?svg=true)](https://ci.appveyor.com/project/DerThorsten/nifty-5sb8n/branch/master)
+
+
+Nifty
+========
+
 
 
 
@@ -37,16 +43,16 @@ The core is implemented in C++ but
 the suggested language to use this library from is
 python.
 
-<!--Important:-->
-<!--=========-->
-<!--To use nifty one needs to checkout some submodules via:-->
+Important:
+=========
+To use nifty one needs to checkout some submodules via:
 
-<!--    git submodule init-->
-<!--    git submodule update-->
+    git submodule init
+    git submodule update
 
-<!--If WITH_MP_LP is active, one needs:-->
+If WITH_MP_LP is active, one needs:
 
-<!--    git submodule update --init --recursive-->
+    git submodule update --init --recursive
 
 Documentation:
 ===============

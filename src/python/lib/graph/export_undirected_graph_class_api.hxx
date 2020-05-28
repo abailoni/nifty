@@ -46,13 +46,7 @@ public:
         return result.release();
     }
 
-    static PYBIND11_DESCR name() {
-        return type_descr(
-            _("Adjacency[") + make_caster<T1>::name() + _(", ") + make_caster<T2>::name() + _("]")
-        );
-    }
-
-    template <typename T> using cast_op_type = type;
+    PYBIND11_TYPE_CASTER(type, _("Adjacency[") + make_caster<T1>::name + _(", ") + make_caster<T2>::name + _("]"));
 
     operator type() {
         return type(cast_op<T1>(first), cast_op<T2>(second));
