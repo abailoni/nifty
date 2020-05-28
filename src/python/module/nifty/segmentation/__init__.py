@@ -152,7 +152,7 @@ def compute_mws_segmentation(weights, offsets, number_of_attractive_channels,
         # increase labels by 1, so we don't merge anything with the mask
         labels += 1
         labels[inv_mask] = 0
-    return labels
+    return labels, valid_edges.sum()
 
 # \\\\\\\\\\\\\\\\\\\\\
 # Previous functions:

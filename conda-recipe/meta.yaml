@@ -18,7 +18,7 @@ package:
   {% else %}
     name: nifty
   {% endif %}
-    version: vplantseg1.0.8
+    version: v1.0.9
 
 source:
   path: ..
