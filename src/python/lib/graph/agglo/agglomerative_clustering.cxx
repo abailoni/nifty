@@ -356,8 +356,8 @@ namespace agglo{
 
             // the cluster operator cls
             py::class_<ClusterPolicyType>(aggloModule, clusterPolicyClsName.c_str())
-                //.def_property_readonly("edgeIndicators", &ClusterPolicyType::edgeIndicators)
-                //.def_property_readonly("edgeSizes", &ClusterPolicyType::edgeSizes)
+                // .def_property_readonly("edgeIndicators", &ClusterPolicyType::edgeIndicators)
+                // .def_property_readonly("edgeSizes", &ClusterPolicyType::edgeSizes)
             ;
 
             // factory
@@ -412,8 +412,8 @@ namespace agglo{
 
             // the cluster operator cls
             py::class_<ClusterPolicyType>(aggloModule, clusterPolicyClsName.c_str())
-                //.def_property_readonly("edgeIndicators", &ClusterPolicyType::edgeIndicators)
-                //.def_property_readonly("edgeSizes", &ClusterPolicyType::edgeSizes)
+                .def_property_readonly("edgeIndicators", &ClusterPolicyType::edgeIndicators)
+                .def_property_readonly("edgeSizes", &ClusterPolicyType::edgeSizes)
             ;
 
             // factory

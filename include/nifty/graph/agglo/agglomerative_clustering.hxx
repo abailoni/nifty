@@ -20,7 +20,7 @@ template<class AGGLOMERATIVE_CLUSTERING>
 class DendrogramAgglomerativeClusteringVisitor{
 private:
 
-    typedef std::tuple<uint64_t,uint64_t, double, double> MergeEncodingType;
+    typedef std::tuple<uint64_t,uint64_t, double, double> MergeEncodingType; 
 
 public:
     typedef AGGLOMERATIVE_CLUSTERING AgglomerativeClusteringType;
@@ -182,21 +182,16 @@ public:
     }
 
 
-
-
-
     template<class MERGE_TIMES, class EDGE_DENDROGRAM_HEIGHT>
     void runAndGetMergeTimesAndDendrogramHeight(
         MERGE_TIMES & mergeTimes,
         EDGE_DENDROGRAM_HEIGHT & dendrogramHeight,
-        const bool verbose=true
+        const bool verbose=false
     ){
         const auto & cgraph = clusterPolicy_.edgeContractionGraph();
         const auto & graph = cgraph.graph();
         for(const auto edge: graph.edges()){
             mergeTimes[edge] = graph.numberOfNodes();
-            // TODO: bad, find better way to initialize this..
-            dendrogramHeight[edge] = -1.;
         }
         auto t=-0;
         while(!clusterPolicy_.isDone()){
@@ -208,14 +203,12 @@ public:
             const auto edgeToContractNext = edgeToContractNextAndPriority.first;
             const auto priority = edgeToContractNextAndPriority.second;
             dendrogramHeight[edgeToContractNext] = priority;
-            mergeTimes[edgeToContractNext] = t;
+            mergeTimes[edgeToContractNext] = edgeToContractNext;
             if(verbose){
                 const auto & cgraph = clusterPolicy_.edgeContractionGraph();
-                if(  (cgraph.numberOfNodes() + 1) % 100000  == 0)
-                    std::cout<<"Nodes "<<cgraph.numberOfNodes()<<" p="<<priority<<"\n";
+                std::cout<<"Nodes "<<cgraph.numberOfNodes()<<" p="<<priority<<"\n";
             }
             clusterPolicy_.edgeContractionGraph().contractEdge(edgeToContractNext);
-            ++t;
         }
         this->ucmTransform(mergeTimes);
         this->ucmTransform(dendrogramHeight);
@@ -241,13 +234,12 @@ public:
             const auto edgeToContractNextAndPriority = clusterPolicy_.edgeToContractNext();
             const auto edgeToContractNext = edgeToContractNextAndPriority.first;
             const auto priority = edgeToContractNextAndPriority.second;
-            mergeTimes[edgeToContractNext] = t;
+            mergeTimes[edgeToContractNext] = edgeToContractNext;
             if(verbose){
                 const auto & cgraph = clusterPolicy_.edgeContractionGraph();
                 std::cout<<"Nodes "<<cgraph.numberOfNodes()<<" p="<<priority<<"\n";
             }
             clusterPolicy_.edgeContractionGraph().contractEdge(edgeToContractNext);
-            ++t;
         }
         this->ucmTransform(mergeTimes);
     }
