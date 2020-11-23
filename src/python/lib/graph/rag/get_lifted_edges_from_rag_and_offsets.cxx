@@ -21,7 +21,7 @@ namespace nifty {
         void exportComputeLiftedEdgesFromRagAndOffsets(
                 py::module & ragModule
         ){
-            ragModule.def("computeLiftedEdgesFromRagAndOffsets",
+            ragModule.def("computeLiftedEdgesFromRagAndOffsets_impl",
                             [](
                                     const RAG & rag,
                                     const std::vector<std::vector<int>> & offsets,

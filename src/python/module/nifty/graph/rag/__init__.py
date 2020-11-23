@@ -282,3 +282,96 @@ if WITH_H5PY:
                        numberOfLabels=numberOfLabels,
                        ignoreLabel=ignoreLabel,
                        serialization=serialization.squeeze())
+
+
+def compute_lifted_edges_from_rag_and_offsets(rag, offsets, numberOfThreads=-1):
+    if isinstance(offsets, numpy.ndarray):
+        offsets = offsets.tolist()
+    else:
+        assert isinstance(offsets, (list, tuple))
+        assert isinstance(offsets, (list, tuple))
+    return computeLiftedEdgesFromRagAndOffsets_impl(rag, offsets, numberOfThreads)
+
+
+import numpy as np
+
+
+def accumulate_affinities_mean_and_length(affinities, offsets, labels, graph=None,
+                                          offset_weights=None,
+                                          ignore_label=None, number_of_threads=-1):
+    """
+
+    Parameters
+    ----------
+    affinities: offset channels expected to be the first one
+    """
+    affinities = np.require(affinities, dtype='float32')
+    affinities = np.rollaxis(affinities, axis=0, start=len(affinities.shape))
+
+    offsets = np.require(offsets, dtype='int32')
+    assert len(offsets.shape) == 2
+
+    if graph is None:
+        graph = gridRag(labels)
+
+    if offset_weights is None:
+        offset_weights = np.ones(offsets.shape[0], dtype='float32')
+    else:
+        offset_weights = np.require(offset_weights, dtype='float32')
+
+    hasIgnoreLabel = (ignore_label is not None)
+    ignore_label = 0 if ignore_label is None else int(ignore_label)
+
+    number_of_threads = -1 if number_of_threads is None else number_of_threads
+
+    edge_indicators_mean, edge_indicators_max, edge_sizes = \
+        accumulateAffinitiesMeanAndLength_impl_(
+            graph,
+            labels.astype('uint64'),
+            affinities,
+            offsets,
+            offset_weights,
+            hasIgnoreLabel,
+            ignore_label,
+            number_of_threads
+        )
+    return edge_indicators_mean, edge_sizes
+
+
+def accumulate_affinities_mean_and_length_inside_clusters(affinities, offsets, labels,
+                                                          offset_weights=None,
+                                                          ignore_label=None, number_of_threads=-1):
+    """
+
+    Parameters
+    ----------
+    affinities: offset channels expected to be the first one
+    """
+    affinities = np.require(affinities, dtype='float32')
+    affinities = np.rollaxis(affinities, axis=0, start=len(affinities.shape))
+
+    offsets = np.require(offsets, dtype='int32')
+    assert len(offsets.shape) == 2
+
+    if offset_weights is None:
+        offset_weights = np.ones(offsets.shape[0], dtype='float32')
+    else:
+        offset_weights = np.require(offset_weights, dtype='float32')
+
+    hasIgnoreLabel = (ignore_label is not None)
+    ignore_label = 0 if ignore_label is None else int(ignore_label)
+
+    number_of_threads = -1 if number_of_threads is None else number_of_threads
+
+    edge_indicators_mean, edge_indicators_max, edge_sizes = \
+        accumulateAffinitiesMeanAndLengthInsideClusters_impl_(
+            labels.astype('uint64'),
+            labels.max(),
+            affinities,
+            offsets,
+            offset_weights,
+            hasIgnoreLabel,
+            ignore_label,
+            number_of_threads
+        )
+    return edge_indicators_mean, edge_sizes
