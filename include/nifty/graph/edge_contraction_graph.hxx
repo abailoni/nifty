@@ -618,6 +618,9 @@ namespace graph{
         const auto v = uv.second;
         NIFTY_TEST_OP(u,!=,v);
 
+        //TODO: here we should choose the node with more neighbors as alive (so the loop is faster and we
+        // perform less updates), if it is possible
+
         // merge them into a single node
         NIFTY_ASSERT_OP(nodeUfd_.find(u),==,u);
         NIFTY_ASSERT_OP(nodeUfd_.find(v),==,v);
