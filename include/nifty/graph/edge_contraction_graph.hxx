@@ -618,9 +618,6 @@ namespace graph{
         const auto v = uv.second;
         NIFTY_TEST_OP(u,!=,v);
 
-        //TODO: here we should choose the node with more neighbors as alive (so the loop is faster and we
-        // perform less updates), if it is possible
-
         // merge them into a single node
         NIFTY_ASSERT_OP(nodeUfd_.find(u),==,u);
         NIFTY_ASSERT_OP(nodeUfd_.find(v),==,v);
@@ -628,7 +625,9 @@ namespace graph{
         --currentNodeNum_;
 
         // check which of u and v is the new representative node
-        // also known as 'aliveNode' and which is the deadNode
+        // also known as 'aliveNode' and which is the deadNode.
+        // Note that the union find data structure (with path compression) already select
+        // the biggest cluster as a new root/parent:
         const auto aliveNode = nodeUfd_.find(u);
         NIFTY_ASSERT(aliveNode==u || aliveNode==v);
         const auto deadNode = aliveNode == u ? v : u;       
