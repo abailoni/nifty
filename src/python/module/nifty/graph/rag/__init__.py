@@ -297,6 +297,7 @@ import numpy as np
 
 
 def accumulate_affinities_mean_and_length(affinities, offsets, labels, graph=None,
+                                          affinities_weights=None,
                                           offset_weights=None,
                                           ignore_label=None, number_of_threads=-1):
     """
@@ -306,7 +307,19 @@ def accumulate_affinities_mean_and_length(affinities, offsets, labels, graph=Non
     affinities: offset channels expected to be the first one
     """
     affinities = np.require(affinities, dtype='float32')
+
+    if affinities_weights is not None:
+        assert offset_weights is None, "Affinities weights and offset weights cannot be passed at the same time"
+        affinities_weights = np.require(affinities_weights, dtype='float32')
+
+    else:
+        affinities_weights = np.ones_like(affinities)
+        if offset_weights is not None:
+            offset_weights = np.require(offset_weights, dtype='float32')
+            affinities_weights *= offset_weights
+
     affinities = np.rollaxis(affinities, axis=0, start=len(affinities.shape))
+    affinities_weights = np.rollaxis(affinities_weights, axis=0, start=len(affinities_weights.shape))
 
     offsets = np.require(offsets, dtype='int32')
     assert len(offsets.shape) == 2
@@ -314,10 +327,6 @@ def accumulate_affinities_mean_and_length(affinities, offsets, labels, graph=Non
     if graph is None:
         graph = gridRag(labels)
 
-    if offset_weights is None:
-        offset_weights = np.ones(offsets.shape[0], dtype='float32')
-    else:
-        offset_weights = np.require(offset_weights, dtype='float32')
 
     hasIgnoreLabel = (ignore_label is not None)
     ignore_label = 0 if ignore_label is None else int(ignore_label)
@@ -329,8 +338,8 @@ def accumulate_affinities_mean_and_length(affinities, offsets, labels, graph=Non
             graph,
             labels.astype('uint64'),
             affinities,
+            affinities_weights,
             offsets,
-            offset_weights,
             hasIgnoreLabel,
             ignore_label,
             number_of_threads

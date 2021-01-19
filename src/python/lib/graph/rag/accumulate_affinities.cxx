@@ -115,8 +115,8 @@ namespace graph{
                               const GRAPH &graph,
                               xt::pytensor<LABELS_TYPE, DIM> labels,
                               xt::pytensor<float, DIM + 1> affinities,
+                              xt::pytensor<float, DIM + 1> affinitiesWeights,
                               xt::pytensor<int, 2> offsets,
-                              xt::pytensor<float, 1> offsetWeights,
                               const bool hasIgnoreLabel,
                               const uint64_t ignoreLabel,
                               const int numberOfThreads
@@ -127,9 +127,10 @@ namespace graph{
                           for(auto d=0; d<DIM; ++d){
                               shape[d] = labels.shape()[d];
                               NIFTY_CHECK_OP(shape[d],==,affinities.shape()[d], "affinities have wrong shape");
+                              NIFTY_CHECK_OP(shape[d],==,affinitiesWeights.shape()[d], "affinities have wrong shape");
                           }
                           NIFTY_CHECK_OP(offsets.shape()[0],==,affinities.shape()[DIM], "Affinities and offsets do not match");
-                          NIFTY_CHECK_OP(offsets.shape()[0], ==, offsetWeights.shape()[0], "Offset weights and offsets do not match");
+                          NIFTY_CHECK_OP(offsets.shape()[0],==,affinitiesWeights.shape()[DIM], "Affinities and offsets do not match");
 
 
                           // Create thread pool:
@@ -168,8 +169,8 @@ namespace graph{
                                                                                                   const auto aff_value = affinities[affIndex];
                                                                                                   if (aff_value > maxAff(threadId, edge))
                                                                                                       maxAff(threadId, edge) = aff_value;
-                                                                                                  counter(threadId,edge) += offsetWeights(i);
-                                                                                                  accAff(threadId,edge) += aff_value * offsetWeights(i);
+                                                                                                  counter(threadId,edge) += affinitiesWeights[affIndex];
+                                                                                                  accAff(threadId,edge) += aff_value * affinitiesWeights[affIndex];
                                                                                               }
                                                                                           }
                                                                                       }
@@ -189,13 +190,13 @@ namespace graph{
                           // Normalize:
                           for(auto i=0; i<nb_edges; ++i){
                               maxAff_out(i) = maxAff(0,i);
-                              for(auto thr=1; thr<numberOfThreads; ++thr){
+                              for(auto thr=1; thr<actualNumberOfThreads; ++thr){
                                   counter(0,i) += counter(thr,i);
                                   accAff(0,i) += accAff(thr,i);
                                   if (maxAff(thr,i) > maxAff_out(i))
                                       maxAff_out(i) = maxAff(thr,i);
                               }
-                              if(counter(0,i)>0.5){
+                              if(counter(0,i)>0.    ){
                                   accAff_out(i) = accAff(0,i) / counter(0,i);
                                   counter_out(i) = counter(0,i);
                               } else {
@@ -208,8 +209,8 @@ namespace graph{
                       py::arg("graph"),
                       py::arg("labels").noconvert(),
                       py::arg("affinities").noconvert(),
+                      py::arg("affinitiesWeights").noconvert(),
                       py::arg("offsets"),
-                      py::arg("offsetWeights"),
                       py::arg("hasIgnoreLabel"),
                       py::arg("ignoreLabel"),
                       py::arg("numberOfThreads") = -1
@@ -289,13 +290,13 @@ namespace graph{
                           // Normalize:
                           for(auto i=0; i<maxLabel+1; ++i){
                               maxAff_out(i) = maxAff(0,i);
-                              for(auto thr=1; thr<numberOfThreads; ++thr){
+                              for(auto thr=1; thr<actualNumberOfThreads; ++thr){
                                   counter(0,i) += counter(thr,i);
                                   accAff(0,i) += accAff(thr,i);
                                   if (maxAff(thr,i) > maxAff_out(i))
                                       maxAff_out(i) = maxAff(thr,i);
                               }
-                              if(counter(0,i)>0.5){
+                              if(counter(0,i)>0.){
                                   accAff_out(i) = accAff(0,i) / counter(0,i);
                                   counter_out(i) = counter(0,i);
                               } else {
