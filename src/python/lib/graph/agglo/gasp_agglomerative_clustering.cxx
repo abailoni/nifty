@@ -64,13 +64,15 @@ namespace nifty{
                                             const typename ClusterPolicyType::UpdateRuleSettingsType updateRule,
                                             const uint64_t numberOfNodesStop,
                                             const double sizeRegularizer,
-                                            const bool addNonLinkConstraints
+                                            const bool addNonLinkConstraints,
+                                            const bool mergeConstrainedEdgesAtTheEnd
                                     ){
                                         typename ClusterPolicyType::SettingsType s;
                                         s.numberOfNodesStop = numberOfNodesStop;
                                         s.sizeRegularizer = sizeRegularizer;
                                         s.updateRule = updateRule;
                                         s.addNonLinkConstraints = addNonLinkConstraints;
+                                        s.mergeConstrainedEdgesAtTheEnd = mergeConstrainedEdgesAtTheEnd;
                                         auto ptr = new ClusterPolicyType(graph, signedWeights, isLocalEdge, edgeSizes, nodeSizes, s);
                                         return ptr;
                                     },
@@ -84,7 +86,8 @@ namespace nifty{
                                     py::arg("updateRule0"),
                                     py::arg("numberOfNodesStop") = 1,
                                     py::arg("sizeRegularizer") = 0.,
-                                    py::arg("addNonLinkConstraints") = false
+                                    py::arg("addNonLinkConstraints") = false,
+                                    py::arg("mergeConstrainedEdgesAtTheEnd") = false
                     );
 
                     // export the agglomerative clustering functionality for this cluster operator

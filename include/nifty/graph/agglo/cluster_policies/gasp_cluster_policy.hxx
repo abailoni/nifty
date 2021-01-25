@@ -54,6 +54,7 @@ namespace nifty{
                     uint64_t numberOfNodesStop{1};
                     double sizeRegularizer{0.};
                     bool addNonLinkConstraints{false};
+                    bool mergeConstrainedEdgesAtTheEnd{false};
                 };
 
                 enum class EdgeStates : uint8_t {
@@ -187,7 +188,6 @@ namespace nifty{
 
                 NonLinkConstraints nonLinkConstraints_;
 
-//    int phase_;
 
                 UPDATE_RULE accumulated_weights_;
                 uint64_t nb_performed_contractions_;
@@ -299,6 +299,20 @@ namespace nifty{
                             this->addNonLinkConstraint(nextActioneEdge);
                             pq_.push(nextActioneEdge, -1.0*std::numeric_limits<double>::infinity());
                         }
+                    }
+                    if (settings_.addNonLinkConstraints && settings_.mergeConstrainedEdgesAtTheEnd) {
+                        // We push again all values to PQ and merge what is left and positive:
+                        settings_.addNonLinkConstraints = false;
+                        graph_.forEachEdge([&](const uint64_t e){
+                            const auto cEdge = edgeContractionGraph_.findRepresentativeEdge(e);
+                            const auto uv = edgeContractionGraph_.uv(cEdge);
+                            const auto u = edgeContractionGraph_.findRepresentativeNode(uv.first);
+                            const auto v = edgeContractionGraph_.findRepresentativeNode(uv.second);
+                            if (u != v) {
+                                pq_.push(cEdge, this->computeWeight(cEdge));
+                            }
+                        });
+                        continue;
                     }
                     return true;
                 }

@@ -48,7 +48,8 @@ def get_GASP_policy(graph,
                     is_mergeable_edge = None,
                     node_sizes = None,
                     size_regularizer = 0.0,
-                    number_of_nodes_to_stop = 1
+                    number_of_nodes_to_stop = 1,
+                    merge_constrained_edges_at_the_end=False
                     ):
     linkage_criteria_kwargs = {} if linkage_criteria_kwargs is None else linkage_criteria_kwargs
     parsed_rule = updateRule(linkage_criteria, **linkage_criteria_kwargs)
@@ -65,7 +66,8 @@ def get_GASP_policy(graph,
                              updateRule0=parsed_rule,
                              numberOfNodesStop=number_of_nodes_to_stop,
                              sizeRegularizer=size_regularizer,
-                             addNonLinkConstraints=add_cannot_link_constraints)
+                             addNonLinkConstraints=add_cannot_link_constraints,
+                             mergeConstrainedEdgesAtTheEnd=merge_constrained_edges_at_the_end)
 
 
 get_GASP_policy.__doc__ = """
