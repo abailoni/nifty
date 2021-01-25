@@ -28,8 +28,6 @@ namespace nifty {
                                     // xt::pytensor<int64_t, 2> offsets,
                                     const int numberOfThreads
                             ){
-
-                                //TODO: avoid this and use lifted_nh?
                                 typedef typename std::vector<array::StaticArray<int64_t, DIM>> OffsetVectorType;
                                 // OffsetVectorType offsetVector(offsets.shape()[0]);
                                 OffsetVectorType offsetVector(offsets.size());
@@ -39,15 +37,6 @@ namespace nifty {
                                         // offsetVector[i][d] = offsets(i,d);
                                     }
                                 }
-
-                                // TODO: To release the gil I need to first initialize the output tensor, but the
-                                //  the output shape is not known yet
-                                // xt::pytensor<uint64_t, 2> edgeOut({3, 4});
-                                // xt::pytensor<uint64_t, 2> edgeOut;
-                                // {
-                                //     py::gil_scoped_release allowThreads;
-                                //     computeLongRangeEdgesFromRagAndOffsets(rag, offsetVector, edgeOut, numberOfThreads);
-                                // }
 
                                 return computeLiftedEdgesFromRagAndOffsets(rag, offsetVector, numberOfThreads);
 
