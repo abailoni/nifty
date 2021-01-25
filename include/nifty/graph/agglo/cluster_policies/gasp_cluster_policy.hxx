@@ -11,6 +11,7 @@
 #include "nifty/graph/edge_contraction_graph.hxx"
 #include "nifty/graph/agglo/cluster_policies/cluster_policies_common.hxx"
 #include <iostream>
+#include <algorithm>    // std::max
 
 
 namespace nifty{
@@ -160,7 +161,7 @@ namespace nifty{
                     xt::xtensor<float, 2> out = xt::zeros<float>({uint64_t(edgeContractionGraph().numberOfEdges()), uint64_t(4)});
                     xt::xtensor<bool, 1> notVisitedEdges = xt::ones<bool>({graph_.edgeIdUpperBound()+1});
                     uint64_t edge_counter = 0;
-                    graph_.forEachEdge([&](const uint64_t edge){
+                    graph_.forEachEdge([&](const uint64_t edge) {
                         const auto cEdge = edgeContractionGraph_.findRepresentativeEdge(edge);
                         const auto uv = edgeContractionGraph_.uv(cEdge);
                         const auto u = edgeContractionGraph_.findRepresentativeNode(uv.first);
@@ -174,7 +175,63 @@ namespace nifty{
                             notVisitedEdges(cEdge) = false;
                         };
                     });
-                    return out;
+
+
+
+                    // -------
+                    // Export data merges/constraints:
+                    // -------
+
+                    // First, we collect information/statistics about constraints:
+                    //  - nb_constraints
+                    //  - sum_of_constrain values
+                    //  - max constraint
+                    //  - min constraint
+                    //  - (collect more stats about size of the edges...?)
+                    xt::xtensor<float, 2> constraintStatistics = xt::zeros<float>({uint64_t(graph_.edgeIdUpperBound()+1), uint64_t(4)});
+                    graph_.forEachEdge([&](const uint64_t edge){
+                        if (wasEdgeConstrained_[edge]) {
+                            // Find the ID of the final boundary (could be now merged or not):
+                            const auto cEdge = edgeContractionGraph_.findRepresentativeEdge(edge);
+                            constraintStatistics(cEdge, 0) += 1.0; // Add one constraint to final boundary
+                            constraintStatistics(cEdge, 1) += weightConstrainedEdges_[edge]; // Increase sum
+                            // The weight of the constrained edge will be always negative, so we keep it in mind while saving the min/max
+                            constraintStatistics(cEdge, 2) = std::max(constraintStatistics(cEdge, 2),-weightConstrainedEdges_[edge]);
+                            constraintStatistics(cEdge, 3) = std::min(constraintStatistics(cEdge, 3),weightConstrainedEdges_[edge]);
+                        }
+                    });
+
+                    // Then, we collect information about merged edges and remaining edges in the final graph:
+                    //  - was the edge merged or not (1 if yes, 0 if not)
+                    //  - edge weight (either before to be merged or in the final graph)
+                    //  - edge size (either before to be merged or in the final graph)
+                    xt::xtensor<float, 2> mergeStatistics = xt::zeros<float>({uint64_t(graph_.edgeIdUpperBound()+1), uint64_t(3)});
+                    graph_.forEachEdge([&](const uint64_t edge){
+                        const auto cEdge = edgeContractionGraph_.findRepresentativeEdge(edge);
+
+                        // First, we fill the remaining parts of the constraintStatistics array:
+                        constraintStatistics(edge, 0) = constraintStatistics(cEdge, 0);
+                        constraintStatistics(edge, 1) = constraintStatistics(cEdge, 1);
+                        constraintStatistics(edge, 2) = constraintStatistics(cEdge, 2);
+                        constraintStatistics(edge, 3) = constraintStatistics(cEdge, 3);
+
+                        // Find the ID of the final boundary (could be now merged or not):
+                        const auto uv = edgeContractionGraph_.uv(cEdge);
+                        const auto u = edgeContractionGraph_.findRepresentativeNode(uv.first);
+                        const auto v = edgeContractionGraph_.findRepresentativeNode(uv.second);
+                        if (u != v) {
+                            // In this case, the edge was not merged:
+                            mergeStatistics(edge, 0) = 0.;
+                        } else {
+                            // In this case, the edge was merged:
+                            mergeStatistics(edge, 0) = 1.;
+                        }
+                        // Now save the information about the boundary:
+                        mergeStatistics(edge, 1) = accumulated_weights_[cEdge];
+                        mergeStatistics(edge, 2) = accumulated_weights_.weight(cEdge);
+                    });
+
+                    return std::make_tuple(out, constraintStatistics, mergeStatistics);
                 }
 
 
@@ -205,6 +262,10 @@ namespace nifty{
 
                 uint64_t edgeToContractNext_;
                 double   edgeToContractNextMergePrio_;
+
+                UInt8EdgeMap wasEdgeConstrained_;
+                FloatEdgeMap sizeConstrainedEdges_;
+                FloatEdgeMap weightConstrainedEdges_;
 
                 NodeSizesType nodeSizes_;
                 NodeSizesType maxNodeSize_per_iter_;
@@ -242,7 +303,10 @@ namespace nifty{
                         max_node_size_(0),
                         sum_node_size_(0),
                         quadratic_sum_node_size_(0),
-                        nb_performed_contractions_(0)
+                        nb_performed_contractions_(0),
+                        weightConstrainedEdges_(graph),
+                        sizeConstrainedEdges_(graph),
+                        wasEdgeConstrained_(graph)
             {
 
                 graph_.forEachNode([&](const uint64_t node) {
@@ -298,6 +362,12 @@ namespace nifty{
                             }
                             this->addNonLinkConstraint(nextActioneEdge);
                             pq_.push(nextActioneEdge, -1.0*std::numeric_limits<double>::infinity());
+
+                            // Remember about weight and size of the constrained edge:
+                            const auto reprEdge = edgeContractionGraph_.findRepresentativeEdge(nextActioneEdge);
+                            wasEdgeConstrained_[reprEdge] = (uint8_t) 1;
+                            sizeConstrainedEdges_[reprEdge] = accumulated_weights_.weight(reprEdge);
+                            weightConstrainedEdges_[reprEdge] = accumulated_weights_[reprEdge];
                         }
                     }
                     if (settings_.addNonLinkConstraints && settings_.mergeConstrainedEdgesAtTheEnd) {
