@@ -42,24 +42,24 @@ namespace nifty{
                 nifty::tools::parallelForEachCoordinate(threadpool,
                             shape,
                     [&](const auto threadId, const auto & coordP){
-                    const auto u = labels[coordP];
-                    for(int io=0; io<offsets.size(); ++io){
-                    const auto offset = offsets[io];
-                    const auto coordQ = offset + coordP;
-                    // Check if both coordinates are in the volume:
-                    if(coordQ.allInsideShape(shape)){
-                    const auto v = labels[coordQ];
+                        const auto u = labels[coordP];
+                        for(int io=0; io<offsets.size(); ++io){
+                            const auto offset = offsets[io];
+                            const auto coordQ = offset + coordP;
+                            // Check if both coordinates are in the volume:
+                            if(coordQ.allInsideShape(shape)){
+                                const auto v = labels[coordQ];
 
-                    // Insert new edge in graph:
-                    if (u != v) {
-                    const auto edge = rag.findEdge(u, v);
-                    if (edge < 0) {
-                    const std::pair <uint64_t, uint64_t> newPair(u, v);
-                    longRangePairs[threadId].push_back(newPair);
-                    }
-                    }
-                    }
-                    }
+                                // Insert new edge in graph:
+                                if (u != v) {
+                                    const auto edge = rag.findEdge(u, v);
+                                    if (edge < 0) {
+                                        const std::pair <uint64_t, uint64_t> newPair(u, v);
+                                        longRangePairs[threadId].push_back(newPair);
+                                    }
+                                }
+                            }
+                        }
                     }
                     );
 

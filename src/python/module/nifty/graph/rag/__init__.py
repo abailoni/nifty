@@ -316,6 +316,8 @@ def accumulate_affinities_mean_and_length(affinities, offsets, labels, graph=Non
         affinities_weights = np.ones_like(affinities)
         if offset_weights is not None:
             offset_weights = np.require(offset_weights, dtype='float32')
+            for _ in range(affinities_weights.ndim-1):
+                offset_weights = np.expand_dims(offset_weights, axis=-1)
             affinities_weights *= offset_weights
 
     affinities = np.rollaxis(affinities, axis=0, start=len(affinities.shape))
