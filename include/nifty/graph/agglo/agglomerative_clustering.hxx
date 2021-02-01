@@ -299,13 +299,15 @@ public:
     }
 
     template<class NODE_MAP>
-    void result(NODE_MAP & nodeMap)const{
-        const auto & cgraph = clusterPolicy_.edgeContractionGraph();
-        const auto & graph = cgraph.graph();
-        for(const auto node : graph.nodes()){
+    void result(NODE_MAP & nodeMap)const {
+        const auto &cgraph = clusterPolicy_.edgeContractionGraph();
+        const auto &graph = cgraph.graph();
+        for (const auto node : graph.nodes()) {
             nodeMap[node] = cgraph.findRepresentativeNode(node);
         }
     }
+
+
 private:
     ClusterPolicyType & clusterPolicy_;
 };

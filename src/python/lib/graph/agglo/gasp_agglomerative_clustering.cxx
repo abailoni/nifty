@@ -47,7 +47,8 @@ namespace nifty{
 //                        auto edgeContractionGraph = self->edgeContractionGraph();
                                      auto out1 = self->exportFinalNodeDataOriginalGraph();
                                      auto out2 = self->exportFinalEdgeDataContractedGraph();
-                                     return std::make_tuple(out1, out2);
+                                     auto out3 = self->exportAction();
+                                     return std::make_tuple(out1, out2, out3);
                                  }
                             );
 
