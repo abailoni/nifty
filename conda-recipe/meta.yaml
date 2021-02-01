@@ -1,6 +1,6 @@
 package:
   name: nifty
-  version: v1.0.9
+  version: v1.0.10
 
 
 source:
@@ -18,8 +18,10 @@ requirements:
     - cmake
 
   host:
-    - python
-    - boost-cpp >=1.63
+#      TODO: update the following req
+    - python =3.7.6
+#      TODO: update the following req
+    - boost-cpp =1.72
     - hdf5 >=1.10
     - numpy >=1.15
     - blosc
@@ -32,7 +34,8 @@ requirements:
     - nlohmann_json
 
   run:
-    - python
+ #      TODO: update the following req
+    - python =3.7.6
     - scikit-image
     - vigra
     - hdf5 >=1.10
