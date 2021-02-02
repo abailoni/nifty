@@ -162,7 +162,8 @@ namespace nifty{
 
                 auto exportFinalEdgeDataContractedGraph(){
                     NIFTY_ASSERT(settings_.collectStats);
-                    // Export edge data of the contracted graph:
+
+                    // Export edge data of the final contracted graph:
                     xt::xtensor<float, 2> out = xt::zeros<float>({uint64_t(edgeContractionGraph().numberOfEdges()), uint64_t(4)});
                     xt::xtensor<bool, 1> notVisitedEdges = xt::ones<bool>({graph_.edgeIdUpperBound()+1});
                     uint64_t edge_counter = 0;
@@ -181,29 +182,31 @@ namespace nifty{
                         };
                     });
 
-
-
                     // -------
                     // Export data merges/constraints:
                     // -------
 
                     // First, we collect information/statistics about constraints:
-                    //  - nb_constraints
-                    //  - sum_of_constrain values
+                    //  - sum of constrained edge sizes
+                    //  - sum of constrained edge weights
                     //  - max constraint
                     //  - min constraint
                     //  - (collect more stats about size of the edges...?)
-                    xt::xtensor<float, 2> constraintStatistics = xt::zeros<float>({uint64_t(graph_.edgeIdUpperBound()+1), uint64_t(4)});
+                    xt::xtensor<float, 2> constraintStatistics = xt::zeros<float>({uint64_t(graph_.edgeIdUpperBound()+1), uint64_t(6)});
                     graph_.forEachEdge([&](const uint64_t edge){
                         if (constraintsStats_(edge, 0) == 1.) {
                             // Find the ID of the final boundary (could be now merged or not):
                             const auto cEdge = edgeContractionGraph_.findRepresentativeEdge(edge);
-                            constraintStatistics(cEdge, 0) += 1.0; // Add one constraint to final boundary
-                            constraintStatistics(cEdge, 1) += constraintsStats_(edge,1); // Increase sum
+                            constraintStatistics(cEdge, 0) += constraintsStats_(edge,2); // Add constraint size
+                            constraintStatistics(cEdge, 1) += constraintsStats_(edge,1)*constraintsStats_(edge,2); // Increase sum
                             // The weight of the constrained edge will be always negative, so we keep it in mind while saving the min/max
                             constraintStatistics(cEdge, 2) = std::max(constraintStatistics(cEdge, 2),-constraintsStats_(edge,1));
                             constraintStatistics(cEdge, 3) = std::min(constraintStatistics(cEdge, 3),constraintsStats_(edge,1));
+                            // Export stats in case the onstrained edge became positive at some point:
+                            constraintStatistics(cEdge, 4) += constraintsStats_(edge,4); // Add constraint size
+                            constraintStatistics(cEdge, 5) += constraintsStats_(edge,3)*constraintsStats_(edge,4); // Increase sum
                         }
+
                     });
 
                     // Then, we collect information about merged edges and remaining edges in the final graph:
@@ -219,6 +222,8 @@ namespace nifty{
                         constraintStatistics(edge, 1) = constraintStatistics(cEdge, 1);
                         constraintStatistics(edge, 2) = constraintStatistics(cEdge, 2);
                         constraintStatistics(edge, 3) = constraintStatistics(cEdge, 3);
+                        constraintStatistics(edge, 4) = constraintStatistics(cEdge, 4);
+                        constraintStatistics(edge, 5) = constraintStatistics(cEdge, 5);
 
                         // Find the ID of the final boundary (could be now merged or not):
                         const auto uv = edgeContractionGraph_.uv(cEdge);
@@ -321,9 +326,10 @@ namespace nifty{
                         nb_performed_contractions_(0),
                         nb_edges_popped_(0)
             {
+                // TODO: do not initialize maxNodeSize_per_iter_ and so on, if stats are not collected
                 if (settings_.collectStats) {
                     actionStats_ = xt::zeros<float>({uint64_t(graph_.numberOfEdges()), uint64_t(5)});
-                    constraintsStats_ = xt::zeros<float>({uint64_t(graph_.numberOfEdges()), uint64_t(2)});
+                    constraintsStats_ = xt::zeros<float>({uint64_t(graph_.numberOfEdges()), uint64_t(5)});
                 }
                 graph_.forEachNode([&](const uint64_t node) {
                     nodeSizes_[node] = nodeSizes[node];
@@ -369,12 +375,14 @@ namespace nifty{
                         if (settings_.addNonLinkConstraints) {
                             if(this->isEdgeConstrained(nextActioneEdge)) {
                                 if (settings_.collectStats) {
-                                    // TODO: check if the constrained edge is now positive and in case remember about it:
+                                    // Check if the constrained edge is now positive and in case remember about it:
                                     if (this->isMergeAllowed(nextActioneEdge)) {
                                         const auto reprEdge = edgeContractionGraph_.findRepresentativeEdge(
                                                 nextActioneEdge);
-                                        // wasEdgeConstrained_[reprEdge] = (uint8_t) 1;
+                                        constraintsStats_(reprEdge, 3) = accumulated_weights_[reprEdge];
+                                        constraintsStats_(reprEdge, 4) = accumulated_weights_.weight(reprEdge);
                                     }
+                                    // Remember that an edge was constrained at this iteration:
                                     actionStats_(nb_edges_popped_, 4) = 1;
                                 }
                                 pq_.push(nextActioneEdge, -1.0*std::numeric_limits<double>::infinity());
@@ -406,7 +414,8 @@ namespace nifty{
                             if (settings_.collectStats) {
                                 const auto reprEdge = edgeContractionGraph_.findRepresentativeEdge(nextActioneEdge);
                                 constraintsStats_(reprEdge, 0) = 1.;
-                                constraintsStats_(reprEdge, 1) = accumulated_weights_[reprEdge];
+                                constraintsStats_(reprEdge, 1) = accumulated_weights_[reprEdge]; // Remember the edge weight
+                                constraintsStats_(reprEdge, 2) = accumulated_weights_.weight(reprEdge); // Remember the edge size
                             }
                         }
                     }
