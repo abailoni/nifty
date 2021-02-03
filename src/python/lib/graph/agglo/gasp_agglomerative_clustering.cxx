@@ -25,6 +25,7 @@ namespace nifty{
                 typedef GRAPH GraphType;
                 const auto graphName = GraphName<GraphType>::name();
                 typedef xt::pytensor<float, 1>   PyViewFloat1;
+                typedef xt::pytensor<double, 1>   PyViewDouble1;
                 typedef xt::pytensor<uint8_t, 1> PyViewUInt8_1;
                 const std::string withUcmStr =  WITH_UCM ? std::string("WithUcm") :  std::string() ;
 
@@ -58,10 +59,10 @@ namespace nifty{
                     aggloModule.def(clusterPolicyFacName.c_str(),
                                     [](
                                             const GraphType & graph,
-                                            const PyViewFloat1 & signedWeights,
+                                            const PyViewDouble1 & signedWeights,
                                             const PyViewUInt8_1 & isLocalEdge,
-                                            const PyViewFloat1 & edgeSizes,
-                                            const PyViewFloat1 & nodeSizes,
+                                            const PyViewDouble1 & edgeSizes,
+                                            const PyViewDouble1 & nodeSizes,
                                             const typename ClusterPolicyType::UpdateRuleSettingsType updateRule,
                                             const uint64_t numberOfNodesStop,
                                             const double sizeRegularizer,
