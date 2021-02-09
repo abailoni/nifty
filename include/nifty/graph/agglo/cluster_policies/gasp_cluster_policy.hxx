@@ -136,7 +136,9 @@ namespace nifty{
                 }
 
                 void addNonLinkConstraint(const uint64_t edge){
-                    const auto uv = edgeContractionGraph_.uv(edge);
+                    const auto reprEdge = edgeContractionGraph_.findRepresentativeEdge(edge);
+                    NIFTY_ASSERT(accumulated_weights_[reprEdge]<0.);
+                    const auto uv = edgeContractionGraph_.uv(reprEdge);
                     const auto u = uv.first;
                     const auto v = uv.second;
                     nonLinkConstraints_[uv.first].insert(uv.second);
@@ -213,7 +215,7 @@ namespace nifty{
                     //  - was the edge merged or not (1 if yes, 0 if not)
                     //  - edge weight (either before to be merged or in the final graph)
                     //  - edge size (either before to be merged or in the final graph)
-                    xt::xtensor<float, 2> mergeStatistics = xt::zeros<float>({uint64_t(graph_.edgeIdUpperBound()+1), uint64_t(3)});
+                    xt::xtensor<float, 2> mergeStatistics = xt::zeros<float>({uint64_t(graph_.edgeIdUpperBound()+1), uint64_t(4)});
                     graph_.forEachEdge([&](const uint64_t edge){
                         const auto cEdge = edgeContractionGraph_.findRepresentativeEdge(edge);
 
@@ -239,6 +241,7 @@ namespace nifty{
                         // Now save the information about the boundary:
                         mergeStatistics(edge, 1) = accumulated_weights_[cEdge];
                         mergeStatistics(edge, 2) = accumulated_weights_.weight(cEdge);
+                        mergeStatistics(edge, 2) = mergeStats_(cEdge);
                     });
 
                     return std::make_tuple(out, constraintStatistics, mergeStatistics);
@@ -271,6 +274,7 @@ namespace nifty{
                 uint64_t nb_edges_popped_;
                 xt::xtensor<float , 2> actionStats_;
                 xt::xtensor<float , 2> constraintsStats_;
+                xt::xtensor<float , 1> mergeStats_;
 
 
                 // State of the edges (LOCAL or LIFTED)
@@ -330,6 +334,7 @@ namespace nifty{
                 if (settings_.collectStats) {
                     actionStats_ = xt::zeros<float>({uint64_t(graph_.numberOfEdges()), uint64_t(5)});
                     constraintsStats_ = xt::zeros<float>({uint64_t(graph_.numberOfEdges()), uint64_t(5)});
+                    mergeStats_ = xt::zeros<float>({uint64_t(graph_.numberOfEdges())});
                 }
                 graph_.forEachNode([&](const uint64_t node) {
                     nodeSizes_[node] = nodeSizes[node];
@@ -469,6 +474,7 @@ namespace nifty{
                     const uint64_t edgeToContract
             ){
                 // Remember about the highest cost in PQ:
+                mergeStats_(edgeToContract) = nb_performed_contractions_;
                 maxCostInPQ_per_iter_[nb_performed_contractions_] = this->edgeCostInPQ(edgeToContract);
                 pq_.deleteItem(edgeToContract);
             }

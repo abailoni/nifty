@@ -31,6 +31,35 @@ namespace tools{
             }
             return dataOut;
         });
+
+    }
+
+    template<class T>
+    void exportFromAdjMatrixToEdgeListT(py::module & toolsModule) {
+        toolsModule.def("fromAdjMatrixToEdgeList",
+                        [](const xt::pyarray<T> & adjMatrix,
+                           xt::pyarray<T> & edgeOut,
+                           const int nbThreads
+                                ){
+                            int nb_edges;
+                            {
+                                py::gil_scoped_release allowThreads;
+                                nb_edges = tools::fromAdjMatrixToEdgeList(adjMatrix, edgeOut, nbThreads);
+                            }
+                            return nb_edges;
+                        });
+        toolsModule.def("fromEdgeListToAdjMatrix",
+                        [](xt::pyarray<T> & A_p,
+                           xt::pyarray<T> & A_n,
+                           const xt::pyarray<T> & edgeList,
+                           const int nbThreads
+                        ){
+                            {
+                                py::gil_scoped_release allowThreads;
+                                tools::fromEdgeListToAdjMatrix(A_p, A_n, edgeList, nbThreads);
+                            }
+                        });
+
     }
 
 
@@ -39,6 +68,12 @@ namespace tools{
         exportMakeDenseT<uint32_t>(toolsModule);
         exportMakeDenseT<uint64_t>(toolsModule);
         exportMakeDenseT<int32_t>(toolsModule);
+
+
+        exportFromAdjMatrixToEdgeListT<int32_t>(toolsModule);
+        exportFromAdjMatrixToEdgeListT<int64_t>(toolsModule);
+        exportFromAdjMatrixToEdgeListT<double_t>(toolsModule);
+        exportFromAdjMatrixToEdgeListT<float_t>(toolsModule);
 
         //exportMakeDenseT<float   , false>(toolsModule);
         exportMakeDenseT<int64_t>(toolsModule);
