@@ -474,7 +474,9 @@ namespace nifty{
                     const uint64_t edgeToContract
             ){
                 // Remember about the highest cost in PQ:
-                mergeStats_(edgeToContract) = nb_performed_contractions_;
+                if (settings_.collectStats) {
+                    mergeStats_(edgeToContract) = nb_performed_contractions_;
+                }
                 maxCostInPQ_per_iter_[nb_performed_contractions_] = this->edgeCostInPQ(edgeToContract);
                 pq_.deleteItem(edgeToContract);
             }
