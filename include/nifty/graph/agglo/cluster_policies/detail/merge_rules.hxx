@@ -127,7 +127,7 @@ namespace merge_rules{
         {
             for(auto edge : g.edges()){
 
-                values_[edge] = values[edge];
+                values_[edge] = values[edge]*weights[edge];
                 weights_[edge] = weights[edge];
             }
         }
